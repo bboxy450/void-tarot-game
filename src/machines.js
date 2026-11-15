@@ -1,7 +1,4 @@
-// Rule machines. Each one is a direct port of a Den model in .bboxy/specs/design/,
-// case for case. Enum values are kept as their Den spelling ('Mode.Trick') so a
-// recorded trace is valid Den and can be checked with `bboxy450-den replay`.
-//
+// Rule machines: small state machines, one per rule of the design.
 // A handler returns  ok(patch, ...effects) | no(reason) | skip(reason).
 
 function ok(patch) { return { o: 'accepted', patch: patch, fx: [].slice.call(arguments, 1) }; }
@@ -9,18 +6,11 @@ function no(reason) { return { o: 'rejected', reason: reason }; }
 function skip(reason) { return { o: 'ignored', reason: reason }; }
 
 function machine(name, initial, handlers) {
-  var m = { name: name, s: initial(), trace: [] };
-  m.traces = [m.trace];
-  // A fresh instance of the same model: new state, new trace.
-  m.reset = function () { m.s = initial(); m.trace = []; m.traces.push(m.trace); };
+  var m = { name: name, s: initial() };
+  m.reset = function () { m.s = initial(); };
   m.send = function (event) {
-    var args = [].slice.call(arguments, 1);
-    var r = handlers[event].apply(null, [m.s].concat(args));
+    var r = handlers[event].apply(null, [m.s].concat([].slice.call(arguments, 1)));
     if (r.o === 'accepted') Object.assign(m.s, r.patch);
-    var line = event + (args.length ? '(' + args.join(', ') + ')' : '') + ' ~> ' + r.o;
-    if (r.o === 'accepted' && r.fx.length) line += ' emits ' + r.fx.join(', ');
-    if (r.o !== 'accepted') line += ' ' + r.reason;
-    m.trace.push(line);
     return r;
   };
   return m;
@@ -28,10 +18,19 @@ function machine(name, initial, handlers) {
 function has(set, x) { return set.indexOf(x) >= 0; }
 function add(set, x) { return has(set, x) ? set : set.concat([x]); }
 
+// What a cast does to the ground. Also used to look ahead.
+function surfaceCast(s, e) {
+  if (s.ground === 'Ground.Bare' && e === 'Element.Earth') return ok({ ground: 'Ground.Oil', left: e });
+  if (s.ground === 'Ground.Bare' && e === 'Element.Water') return ok({ ground: 'Ground.Wet', left: e });
+  if (s.ground === 'Ground.Oil' && e === 'Element.Fire') return ok({ ground: 'Ground.Bare' }, 'Explode');
+  if (s.ground === 'Ground.Wet' && e === 'Element.Air') return ok({ ground: 'Ground.Charged', left: e });
+  if (s.ground === 'Ground.Charged' && e === 'Element.Air') return ok({}, 'Zap');
+  return skip('NoReaction');
+}
+
 function makeMachines() {
   var M = {};
 
-  // journey.den
   M.journey = machine('journey', function () { return { chapter: 0, beat: 0, age: 10, gameSeen: false }; }, {
     WatchNobles: function (s) {
       return s.chapter === 0 && !s.gameSeen ? ok({ gameSeen: true }) : skip('AlreadySeen');
@@ -44,7 +43,6 @@ function makeMachines() {
     }
   });
 
-  // chapter.den
   M.chapter = machine('chapter', function () {
     return { read: false, lived: false, secret: 'Secret.Hidden', cast: false, found: false };
   }, {
@@ -69,7 +67,6 @@ function makeMachines() {
     }
   });
 
-  // encounter.den
   M.encounter = machine('encounter', function () {
     return { open: false, mode: 'Mode.Trick', opposed: false, obstacle: 'Obstacle.None', shaped: false };
   }, {
@@ -94,7 +91,6 @@ function makeMachines() {
     }
   });
 
-  // trick.den
   M.trick = machine('trick', function () { return { played: 'Nothing', top: 0, contends: false }; }, {
     RivalTrumps: function (s, r) { return r > s.top ? ok({ top: r, contends: false }) : skip('LowerTrump'); },
     Follow: function (s, canFollow) {
@@ -117,7 +113,6 @@ function makeMachines() {
     Gather: function (s) { return s.played !== 'Nothing' ? ok({ played: 'Nothing', top: 0, contends: false }) : no('TrickOpen'); }
   });
 
-  // numeric.den
   M.numeric = machine('numeric', function () { return { target: 0, total: 0 }; }, {
     Pose: function (s, t) { return s.target === 0 ? ok({ target: t }) : no('AlreadyPosed'); },
     Play: function (s, v) {
@@ -130,19 +125,10 @@ function makeMachines() {
     Leave: function (s) { return s.target > 0 && s.total === s.target ? ok({ target: 0, total: 0 }, 'Solved') : no('Unsolved'); }
   });
 
-  // surface.den
   M.surface = machine('surface', function () { return { ground: 'Ground.Bare', left: 'Element.Earth' }; }, {
-    Cast: function (s, e) {
-      if (s.ground === 'Ground.Bare' && e === 'Element.Earth') return ok({ ground: 'Ground.Oil', left: e });
-      if (s.ground === 'Ground.Bare' && e === 'Element.Water') return ok({ ground: 'Ground.Wet', left: e });
-      if (s.ground === 'Ground.Oil' && e === 'Element.Fire') return ok({ ground: 'Ground.Bare' }, 'Explode');
-      if (s.ground === 'Ground.Wet' && e === 'Element.Air') return ok({ ground: 'Ground.Charged', left: e });
-      if (s.ground === 'Ground.Charged' && e === 'Element.Air') return ok({}, 'Zap');
-      return skip('NoReaction');
-    }
+    Cast: surfaceCast
   });
 
-  // character.den
   M.character = machine('character', function () {
     return { standing: false, held: [], won: false, way: 'Victory.Affection' };
   }, {
@@ -168,7 +154,6 @@ function makeMachines() {
     Leave: function (s) { return s.won ? ok({ standing: false, held: [], won: false }) : no('NotWon'); }
   });
 
-  // spread.den
   function complete(s) {
     var f = function (p) { return has(s.filled, 'Slot.' + p); };
     return f('Left') && f('Centre') && f('Right') && (s.shape === 'Shape.Row' || (f('Above') && f('Below')));
@@ -191,7 +176,6 @@ function makeMachines() {
     }
   });
 
-  // correspondences.den
   var SUIT_EL = { 'Suit.Wands': 'Fire', 'Suit.Cups': 'Water', 'Suit.Swords': 'Air', 'Suit.Pentacles': 'Earth' };
   var RANK_EL = { 'Rank.Page': 'Earth', 'Rank.Knight': 'Air', 'Rank.Queen': 'Water', 'Rank.King': 'Fire' };
   var PATTERN = [null, 'Beginning', 'Duality', 'Growth', 'Structure', 'Conflict', 'Harmony', 'Challenge', 'Movement', 'Fruition', 'Completion'];
@@ -221,4 +205,4 @@ function makeMachines() {
 
   return M;
 }
-if (typeof module !== 'undefined') module.exports = makeMachines;
+if (typeof module !== 'undefined') { module.exports = makeMachines; makeMachines.surfaceCast = surfaceCast; }

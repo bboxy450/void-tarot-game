@@ -1,14 +1,14 @@
 // The screen. Reads the game, draws it, sends clicks back.
 (function () {
-  var KEY = 'void-tarot-game-1', G, modifierNext = false;
+  var KEY = 'void-tarot-game-2', G, modifierNext = false, editWhat = 'copy', speakNext = null;
   var q = new URLSearchParams(location.search);
 
-  function boot(n, seed) {
+  function boot(n, seed, saved) {
     G = makeGame(seed);
-    G.resume(n);
+    G.resume(n, saved);
     window.G = G;
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify({ n: G.M.journey.s.chapter, seed: G.seed })); } catch (e) {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ n: G.M.journey.s.chapter, seed: G.seed, own: G.own, known: G.known })); } catch (e) {} }
   function load() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
 
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -20,6 +20,15 @@
   function hand(cards, act, note) { return '<div class="row">' + cards.map(function (c, i) { return card(c, act + ':' + i, note ? note(c) : ''); }).join('') + '</div>'; }
   function step(n, title, done, body) {
     return '<section class="step' + (done ? ' done' : '') + '"><h3><b>' + n + '</b> ' + title + (done ? '<i>done</i>' : '') + '</h3>' + body + '</section>';
+  }
+
+  var EDITS = { copy: 'Copy a card', remove: 'Remove a card', more: 'Enchant: more power', less: 'Enchant: less power' };
+  function mark(o) { return (o.copies > 1 ? 'x' + o.copies + ' ' : '') + (o.power > 0 ? 'more power' : o.power < 0 ? 'less power' : ''); }
+  function reward() {
+    return '<section class="step"><h3><b>+</b> Change one thing about your deck</h3><p class="row">' +
+      Object.keys(EDITS).map(function (k) { return '<button data-a="editMode:' + k + '" class="' + (editWhat === k ? 'on' : '') + '">' + EDITS[k] + '</button>'; }).join('') +
+      '<button data-a="skipEdit">Leave it as it is</button></p><p class="fact">Then choose the card:</p><div class="row">' +
+      Object.keys(G.own).map(function (i) { return card(CARDS[i], 'edit:' + i, mark(G.own[i])); }).join('') + '</div></section>';
   }
 
   function encounter(ch) {
@@ -34,10 +43,13 @@
         '<div class="row">' + card(t.lead, '', 'led') + '</div><p class="fact">Your hand:</p>' + hand(e.hand, 'playTrick');
     } else if (ch.mode === 'Numeric') {
       out += '<p class="fact">Total <b>' + M.numeric.s.total + '</b> of <b>' + M.numeric.s.target + '</b>.</p>' +
-        hand(e.hand, 'playNumber', function (c) { return 'worth ' + c.n; }) + '<p><button data-a="withdraw">Take the cards back</button></p>';
+        hand(e.hand, 'playNumber', function (c) { return 'worth ' + G.value(c); }) + '<p><button data-a="withdraw">Take the cards back</button></p>';
     } else if (ch.mode === 'Elemental') {
       out += '<p class="fact">On the ground: <b>' + M.surface.s.ground.replace('Ground.', '').toLowerCase() + '</b>.</p>' +
-        hand(e.hand, 'castElement', function (c) { return ELEMENT[c.suit]; });
+        hand(e.hand, 'castElement', function (c) { var o = G.own[c.i]; return G.element(c) + (o && o.el ? ' (changed)' : ''); }) +
+        '<p class="row">' + (G.known && !e.spoken ? '<span class="fact">Speak Water to Wine, then choose a card to turn to:</span>' +
+          ['Fire', 'Water', 'Air', 'Earth'].map(function (x) { return '<button data-a="speakEl:' + x + '" class="' + (speakNext === x ? 'on' : '') + '">' + x + '</button>'; }).join('') : '') +
+        '<button data-a="redeal">Gather the cards and start again</button></p>';
     } else {
       var s = M.character.s;
       out += '<p class="fact">Character: <b>' + (e.who ? esc(e.who.title) : 'nobody yet') + '</b>. Holds: <b>' +
@@ -51,10 +63,11 @@
   function draw() {
     var j = G.M.journey.s, c = G.M.chapter.s, ch = G.ch;
     document.getElementById('head').innerHTML = '<h1>VOID TAROT</h1>' +
-      '<span>' + (G.over ? 'The journey is complete' : 'Chapter ' + j.chapter + ' of 78') + '</span><span>The Fool is ' + j.age + '</span><span>Deck: ' + G.deck.length + ' cards</span>' +
+      '<span>' + (G.over ? 'The journey is complete' : 'Chapter ' + j.chapter + ' of 78') + '</span><span>The Fool is ' + j.age + '</span><span>Deck: ' + G.deckSize() + ' cards</span>' +
       '<span class="grow"></span><button data-a="reset">Start over</button>';
     var side = '<aside><h3>What the cards have taught you</h3><ul>' +
-      (G.lessons.slice(-12).reverse().map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') || '<li>Nothing yet. Play a card.</li>') + '</ul></aside>';
+      (G.lessons.slice(-12).reverse().map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') || '<li>Nothing yet. Play a card.</li>') + '</ul>' +
+      '<h3>Your deck</h3><ul>' + (Object.keys(G.own).map(function (i) { return '<li>' + esc(CARDS[i].title) + ' <b>' + mark(G.own[i]) + '</b></li>'; }).join('') || '<li>You hold no cards yet.</li>') + '</ul></aside>';
     if (G.over) {
       document.getElementById('main').innerHTML = '<div class="end"><h2>The Fool is ' + j.age + '.</h2><p>Seventy-eight chapters, seventy-eight cards.</p></div>';
       return;
@@ -65,7 +78,7 @@
     document.getElementById('main').innerHTML =
       '<div class="hero"><img src="' + ch.card.img + '" alt=""><h2>' + esc(ch.card.title) + '</h2><p>' + esc(ch.card.meaning) + '</p>' +
       '<p>This chapter uses the cards as: <b>' + { Trick: 'the nobles\' game', Numeric: 'numbers', Elemental: 'elements', Character: 'characters' }[ch.mode] + '</b>.</p></div>' +
-      '<div><div id="msg">' + esc(G.msg || 'Five things must be done before the chapter lets you go.') + '</div>' +
+      '<div><div id="msg">' + esc(G.msg || 'Five things must be done before the chapter lets you go.') + '</div>' + (G.reward ? reward() : '') +
       step(1, 'The psychic reads for you', c.read, ch.reading
         ? '<div class="row">' + ch.reading.map(function (x) { return card(x, '', x.up.join(', ')); }).join('') + '</div>'
         : '<button data-a="visitPsychic">Visit the psychic</button>') +
@@ -83,17 +96,21 @@
   document.addEventListener('click', function (ev) {
     var el = ev.target.closest('[data-a]'); if (!el) return;
     var a = el.getAttribute('data-a').split(':'), act = a[0], arg = a[1];
-    if (act === 'reset') { if (confirm('Start the journey over?')) { localStorage.removeItem(KEY); boot(0, Date.now() % 1e9); } }
+    if (act === 'reset') { if (confirm('Start the journey over?')) { localStorage.removeItem(KEY); boot(0, Date.now() % 1e9, null); } }
     else if (act === 'modifier') modifierNext = !modifierNext;
     else if (act === 'spell') { if (modifierNext) G.layModifier(+arg); else G.lay(+arg); modifierNext = false; }
     else if (act === 'claim') G.claim(arg);
+    else if (act === 'editMode') editWhat = arg;
+    else if (act === 'edit') G.edit(editWhat, +arg);
+    else if (act === 'speakEl') speakNext = speakNext === arg ? null : arg;
+    else if (act === 'castElement' && speakNext) { G.speak(+arg, speakNext); speakNext = null; }
     else G[act](arg === undefined ? undefined : +arg);
     save(); draw();
   });
 
   // ?auto=N plays N chapters with the scripted player; ?enter=1 opens the encounter. For looking at later chapters quickly.
   var saved = q.has('auto') || q.has('fresh') ? null : load();
-  boot(saved ? saved.n : 0, saved ? saved.seed : Number(q.get('seed')) || Date.now() % 1e9);
+  boot(saved ? saved.n : 0, saved ? saved.seed : Number(q.get('seed')) || Date.now() % 1e9, saved && saved.own ? saved : null);
   for (var i = 0; i < Number(q.get('auto') || 0) && !G.over; i++) G.botChapter();
   if (q.has('enter') && !G.over) { G.visitPsychic(); G.openEncounter(); }
   draw();

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Opens index.html in headless Chrome and plays chapters by clicking the page.
-// Usage: node tools/drive-chrome.js [chapters=5] [screenshot.png]
+// Usage: node tools/drive-chrome.js [chapters=9] [screenshot.png]
 var { spawn } = require('child_process'), path = require('path'), fs = require('fs'), os = require('os');
 var CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-var chapters = Number(process.argv[2] || 5), shot = process.argv[3];
+var chapters = Number(process.argv[2] || 9), shot = process.argv[3];
 var url = 'file://' + path.resolve(__dirname, '..', 'index.html') + '?fresh=1&seed=11';
 var profile = fs.mkdtempSync(path.join(os.tmpdir(), 'vtg-chrome-'));
 var chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--remote-debugging-port=9333', '--user-data-dir=' + profile, '--window-size=1400,1600', 'about:blank'], { stdio: 'ignore' });
@@ -12,6 +12,17 @@ var chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--remote-debuggi
 function playChapter() {
   var click = function (a) { var el = document.querySelector('[data-a="' + a + '"]'); if (!el) throw new Error('no element ' + a + ' / ' + G.msg); el.click(); };
   var ch = G.ch, mode = ch.mode, before = G.M.journey.s.chapter, i, guard = 0;
+  var did = [];
+  if (G.reward) {           // the deck edit offered after a chapter: copy, then more power, then less power, by clicks
+    var what = ['copy', 'more', 'less'][before % 3], size = G.deckSize();
+    var target = Object.keys(G.own).filter(function (k) { return what === 'copy' ? G.own[k].copies < 3 : (!G.own[k].power && CARDS[k].suit !== 'major' && CARDS[k].n <= 10); })[0];
+    click('editMode:' + what); click('edit:' + target);
+    if (G.reward) throw new Error('edit ' + what + ' did not apply: ' + G.msg);
+    if (what === 'copy' && G.deckSize() !== size + 1) throw new Error('copy did not add a card');
+    if (what !== 'copy' && !G.own[target].power) throw new Error('enchantment did not stick');
+    did.push(what);
+  }
+  if (Object.keys(G.own).some(function (k) { return G.own[k].el; })) throw new Error('a card kept a changed element into chapter ' + before);
   click('advance');
   if (!/ChapterUnfinished/.test(document.getElementById('msg').textContent)) throw new Error('early leave was not refused on screen');
   click('visitPsychic'); click('openEncounter');
@@ -20,10 +31,15 @@ function playChapter() {
     if (mode === 'Trick') { for (i = 0; i < n; i++) { click('playTrick:' + i); if (moved()) break; } }
     else if (mode === 'Numeric') {
       var left = G.M.numeric.s.target - G.M.numeric.s.total, pickI = -1;
-      for (var mask = 1; mask < (1 << n) && pickI < 0; mask++) { var s = 0, f = -1; for (i = 0; i < n; i++) if (mask & (1 << i)) { s += ch.enc.hand[i].n; if (f < 0) f = i; } if (s === left) pickI = f; }
+      for (var mask = 1; mask < (1 << n) && pickI < 0; mask++) { var s = 0, f = -1; for (i = 0; i < n; i++) if (mask & (1 << i)) { s += G.value(ch.enc.hand[i]); if (f < 0) f = i; } if (s === left) pickI = f; }
       click(pickI < 0 ? 'withdraw' : 'playNumber:' + pickI);
     }
-    else if (mode === 'Elemental') { for (i = 0; i < n; i++) { click('castElement:' + i); if (moved()) break; } }
+    else if (mode === 'Elemental') {
+      var plan = G.planElemental();
+      if (!plan) click('redeal');
+      else if (plan.speak) { click('speakEl:' + plan.speak[1]); click('castElement:' + plan.speak[0]); if (!e.spoken) throw new Error('incantation not spoken: ' + G.msg); did.push('incantation'); }
+      else click('castElement:' + plan.cast);
+    }
     else if (!G.M.character.s.standing) click('playCharacter:' + ch.enc.hand.findIndex(function (c) { return c.suit === 'major' || c.n > 10; }));
     else if (n && !ch.enc.tried) { for (i = n - 1; i >= 0; i--) click('playCharacter:' + i); ch.enc.tried = 1; }
     else ['Affection', 'Resources', 'Attack', 'Impenetrable'].some(function (w) { click('claim:' + w); return ch.encDone; });
@@ -32,7 +48,7 @@ function playChapter() {
   for (i = 0; i < 6 && !G.M.chapter.s.found; i++) click('flip:' + i);
   click('advance');
   if (G.M.journey.s.chapter !== before + 1) throw new Error('chapter ' + before + ' not left: ' + G.msg);
-  return mode + ' (' + ch.card.title + ')';
+  return mode + (did.length ? ' [' + did.join(', ') + ']' : '');
 }
 
 (async function () {
@@ -64,12 +80,19 @@ function playChapter() {
   var played = [];
   for (var c = 0; c < chapters; c++) played.push(await evaluate('(' + playChapter + ')()'));
   var head = await evaluate('document.getElementById("head").textContent');
+  // Reload: the saved journey must come back with the same deck.
+  var before = await evaluate('JSON.stringify([G.M.journey.s.chapter, G.own, G.known])');
+  await send('Page.navigate', { url: url.replace(/\?.*/, '') });
+  await new Promise(function (r) { setTimeout(r, 1200); });
+  var after = await evaluate('JSON.stringify([G.M.journey.s.chapter, G.own, G.known])');
+  if (before !== after) errors.push('reload lost the deck: ' + before.length + ' vs ' + after.length + ' bytes');
   var images = await evaluate('[].slice.call(document.images).filter(function(i){return !i.complete || !i.naturalWidth}).length');
   if (shot) fs.writeFileSync(shot, Buffer.from((await send('Page.captureScreenshot')).result.data, 'base64'));
   var remote = requests.filter(function (u) { return !/^(file|data|about):/.test(u); });
   ws.close(); chrome.kill();
   console.log('played by clicking:', played.join(', '));
   console.log('header:', head.replace(/\s+/g, ' '));
+  console.log('reload kept chapter, deck, copies and enchantments:', before === after);
   console.log('requests:', requests.length, 'non-local:', remote.length, 'broken images:', images, 'script errors:', errors.length);
   if (errors.length) console.error(errors.join('\n'));
   process.exit(errors.length || remote.length || images ? 1 : 0);
