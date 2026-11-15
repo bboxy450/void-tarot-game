@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Void Tarot — The Fool's Journey</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div id="stage">
+  <div id="shaker">
+    <div id="screen-title" class="screen"></div>
+    <div id="screen-map" class="screen"></div>
+    <div id="screen-fight" class="screen"></div>
+    <div id="screen-reward" class="screen"></div>
+    <div id="screen-end" class="screen"></div>
+    <div id="cards"></div>
+    <div id="floats"></div>
+    <div id="overlay"></div>
+    <div id="tip"></div>
+    <div id="topbar">
+      <button id="btn-deck" class="icon-btn" data-tip="Your deck"></button>
+      <button id="btn-mute" class="icon-btn" data-tip="Sound on / off (M)"></button>
+      <button id="btn-menu" class="icon-btn" data-tip="Leave to the title"></button>
+    </div>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+<div id="vignette"></div>
+<div id="hurt"></div>
+<div id="flash"></div>
+<div id="curtain"></div>
+<script src="src/cards.js"></script>
+<script src="src/core.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/fx.js"></script>
+<script src="src/game.js"></script>
+<script src="src/fight.js"></script>
+<script src="src/journey.js"></script>
+<script>VT.boot();</script>
+</body>
+</html>
