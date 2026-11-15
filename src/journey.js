@@ -61,9 +61,9 @@
   }
 
   // ------------------------------------------------------------------ the road
-  var NX = 172;
+  var NX = 196;
   function nodeX(i) { return 300 + i * NX; }
-  function nodeY(i) { return 452 + 118 * Math.sin(i * 0.82) + 34 * Math.sin(i * 0.31 + 1); }
+  function nodeY(i) { return 468 + 104 * Math.sin(i * 0.82) + 30 * Math.sin(i * 0.31 + 1); }
 
   function map(o) {
     o = o || {};
@@ -97,9 +97,14 @@
         (tr ? '<div class="m-trait"><b>' + tr.name + '.</b> ' + tr.text + '</div>' : '') +
         (run.scars ? '<div class="m-trait dim">You have fallen ' + run.scars + (run.scars === 1 ? ' time' : ' times') + ' on this road.</div>' : '') +
         '<button class="btn big" id="btn-enter">Face the Shade</button></div>';
+      s += '<div class="m-deck" id="m-deck"><div class="m-deck-label">Your deck · ' + run.deck.length + ' cards</div><div class="m-deck-fan" id="m-deck-fan"></div></div>';
       s += '<div class="m-help">drag the road to look ahead</div>';
       el.innerHTML = s;
 
+      var fan = $('#m-deck-fan', el), shown = VT.sortDeck(run.deck.map(function (id) { return { id: id }; })).slice(0, 16);
+      shown.forEach(function (inst) { fan.appendChild(VT.thumbEl(inst, 62)); });
+      if (run.deck.length > shown.length) fan.appendChild(h('div', 'm-deck-more', '+' + (run.deck.length - shown.length)));
+      $('#m-deck', el).addEventListener('click', VT.showDeck);
       var world = $('#map-world', el), cam = 0, maxCam = total - VT.W;
       function setCam(x, ms) {
         cam = Math.max(0, Math.min(maxCam, x));
@@ -110,7 +115,7 @@
       setCam(nodeX(from) - 470);
       // look ahead by dragging or with the wheel
       var drag = null;
-      el.addEventListener('pointerdown', function (e) { if (e.target.closest('.m-panel') || e.target.closest('.btn')) return; drag = { x: e.clientX, cam: cam, moved: false }; });
+      el.addEventListener('pointerdown', function (e) { if (e.target.closest('.m-panel') || e.target.closest('.btn') || e.target.closest('.m-deck')) return; drag = { x: e.clientX, cam: cam, moved: false }; });
       var mv = function (e) { if (!drag) return; var dx = (e.clientX - drag.x) / VT.view.s; if (Math.abs(dx) > 4) drag.moved = true; setCam(drag.cam - dx); VT.hideTip(); };
       var up = function () { drag = null; };
       root.addEventListener('pointermove', mv); root.addEventListener('pointerup', up);

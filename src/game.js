@@ -104,6 +104,11 @@
       '<div class="card-face card-back"></div></div></div>';
     el._inst = inst;
     el._p = { x: 0, y: 0, r: 0, s: 1 };
+    // tilt toward the pointer while hovered (the CSS reads --rx / --ry)
+    el.addEventListener('mousemove', function (e) {
+      var r = el.getBoundingClientRect(), px = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), py = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+      el.style.setProperty('--ry', ((px - 0.5) * 20).toFixed(1) + 'deg'); el.style.setProperty('--rx', ((0.5 - py) * 12).toFixed(1) + 'deg');
+    });
     (o.parent || cardsEl).appendChild(el);
     if (o.x != null) VT.moveCard(el, o.x, o.y, o.r || 0, o.s || 1, 0);
     return el;
@@ -262,7 +267,7 @@
       if (i % 3 !== 2) run.deck.push(o[0]); else if (o[1] != null) run.deck.push(o[1]);
       run.seen = { all: 1 };
     }
-    run.chapter = n; run.hp = Core.maxHp(n); run.phase = 'map';
+    run.chapter = n; run.hp = +params.get('hp') || Core.maxHp(n); run.phase = 'map';
     return run;
   }
 

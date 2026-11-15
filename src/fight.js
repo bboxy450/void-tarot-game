@@ -7,9 +7,9 @@
   var $ = VT.$, h = VT.h, sleep = VT.sleep, anim = VT.anim, glyph = VT.glyph;
 
   var SHADE = { x: 1100, y: 312, w: 310, h: 466 };
-  var GROUND = { x: 1100, y: 566 };
+  var GROUND = { x: 1100, y: 592 };
   var DRAW = { x: 112, y: 782, s: 0.6 }, DISC = { x: 1328, y: 782, s: 0.6 };
-  var PLAYER = { x: 150, y: 636 };
+  var PLAYER = { x: 190, y: 622 };
   var SLOT_Y = 304, SLOT_S = 0.95;
   var SLOT_NAMES = ['Past', 'Present', 'Future', 'Beyond'];
   var GROUND_TEXT = {
@@ -52,7 +52,7 @@
       s += '<div class="shade" id="shade"><div class="shade-bob"><div class="shade-act"><div class="shade-card" style="background-image:url(' + VT.img(f.ch) + ')"></div><div class="shade-ward"></div><div class="shade-stun">' + glyph('void', 30) + glyph('void', 22) + glyph('void', 26) + '</div></div></div></div>';
       s += '<div class="shade-status" id="shade-status"></div>';
       s += '<div class="ground-label" id="ground-label"></div>';
-      s += '<div class="player" id="player"><div class="player-name">The Fool <span>age ' + Math.floor(Core.ageOf(f.ch)) + '</span></div>' +
+      s += '<div class="player" id="player"><div class="player-face"></div><div class="player-name">The Fool <span>age ' + Math.floor(Core.ageOf(f.ch)) + '</span></div>' +
         '<div class="bar player-bar" id="player-bar"><div class="bar-ghost"></div><div class="bar-fill"></div><div class="bar-text"></div></div><div class="player-status" id="player-status"></div></div>';
       s += '<div class="pile" id="pile-draw" data-tip="Draw pile. Click to look through your deck."><div class="pile-n"></div><div class="pile-name">Deck</div></div>';
       s += '<div class="pile" id="pile-disc" data-tip="Discard pile. It is shuffled back when the deck runs out."><div class="pile-n"></div><div class="pile-name">Discard</div></div>';
@@ -239,6 +239,7 @@
     if (sl.heal) a.push('<b>heal ' + sl.heal + '</b>');
     if (sl.curse) a.push('adds a curse to your deck');
     var s = a.join(', ');
+    if (!sl.combo && sl.to && sl.to !== sl.from) s += (s ? '. ' : '') + { oil: 'Leaves <em class="combo-explosion">oil</em> on the ground', wet: 'Leaves the ground <em class="combo-charge">wet</em>', charged: 'Leaves the ground <em class="combo-zap">charged</em>', bare: 'Clears the ground' }[sl.to];
     if (sl.combo) s += (s ? '. ' : '') + '<em class="combo-' + sl.combo + '">' + COMBO_TEXT[sl.combo] + '</em>';
     return s || 'No effect right now';
   }
@@ -261,7 +262,7 @@
     }
     var html = VT.cardTipHTML(inst, f.ch, extra);
     if (i >= 0) VT.tip(html, p.x, SLOT_Y + 138, { below: true });
-    else VT.tip(html, p.x, 528);
+    else VT.tip(html, p.x < 760 ? p.x + 132 + 150 : p.x - 132 - 150, 540, { below: true });
   }
 
   // Forecast: what the current spread will do, shown on the slots, the bars and the intent.
@@ -427,7 +428,7 @@
       if (!el) return;
       activeEl = el; el.classList.add('active');
       AU.play('activate');
-      if (!inst.rev && CARDS[inst.id].kind === 'trump') VT.float(slotX(e.i), SLOT_Y - 150, Core.TRUMPS[inst.id][0], 'f-latin', { dy: -34, dur: 1500 });
+      if (!inst.rev && CARDS[inst.id].kind === 'trump') VT.float(slotX(e.i), SLOT_Y - 196, Core.TRUMPS[inst.id][0], 'f-latin', { dy: -16, dur: 1500 });
       FX.burst(EL_PART[VT.elOf(inst)] || 'void', slotX(e.i), SLOT_Y, 14, { rx: 80, ry: 120, speed: 140, life: 0.6 });
       await sleep(210);
     },
@@ -534,14 +535,14 @@
         pc.style.cssText = 'left:' + q * pw + 'px;top:' + r * ph + 'px;width:' + (pw + 0.5) + 'px;height:' + (ph + 0.5) + 'px;background-image:url(' + VT.img(f.ch) + ');background-size:' + SHADE.w + 'px ' + SHADE.h + 'px;background-position:-' + q * pw + 'px -' + r * ph + 'px';
         actEl.appendChild(pc);
         var dx = (q - (cols - 1) / 2) * (60 + Math.random() * 110), dy = (r - (rows - 1) / 2) * (40 + Math.random() * 60) + 80 + Math.random() * 240;
-        anim(pc, [{ transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1, filter: 'brightness(3)' }, { transform: 'translate(' + dx * 0.6 + 'px,' + (dy * 0.3 - 60) + 'px) rotate(' + (Math.random() - 0.5) * 300 + 'deg) scale(0.9)', opacity: 1, filter: 'brightness(1.4)', offset: 0.4 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (Math.random() - 0.5) * 900 + 'deg) scale(0.3)', opacity: 0, filter: 'brightness(1)' }], { duration: 900 + Math.random() * 700, fill: 'forwards', easing: 'cubic-bezier(.2,.6,.4,1)' });
+        anim(pc, [{ transform: 'translate(0,0) rotate(0deg) scale(1)', opacity: 1, filter: 'brightness(3)' }, { transform: 'translate(' + dx * 0.6 + 'px,' + (dy * 0.3 - 60) + 'px) rotate(' + (Math.random() - 0.5) * 300 + 'deg) scale(0.9)', opacity: 1, filter: 'brightness(2.6)', offset: 0.55 }, { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (Math.random() - 0.5) * 900 + 'deg) scale(0.4)', opacity: 0, filter: 'brightness(1.8)' }], { duration: 1200 + Math.random() * 900, fill: 'forwards', easing: 'cubic-bezier(.2,.6,.4,1)' });
       }
       actEl.style.filter = 'none'; actEl.getAnimations().forEach(function (a) { a.cancel(); });
       FX.burst('shard', SHADE.x, SHADE.y, 110, { rx: 140, ry: 220, speed: 620, min: 100 });
       FX.burst('void', SHADE.x, SHADE.y, 160, { rx: 140, ry: 220, speed: 420 });
       FX.ring(SHADE.x, SHADE.y, '150,170,255', 620, 1000, { w: 8 });
       setBar(shadeBar, 0, f.shade.max);
-      await sleep(1300);
+      await sleep(1500);
     },
     shadeHeal: async function (e) {
       AU.play('shadeHeal');

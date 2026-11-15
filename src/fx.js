@@ -7,7 +7,7 @@
   var view = { s: 1, ox: 0, oy: 0, dpr: 1, w: 1440, h: 900 };
   var parts = [], back = [], bolts = [], rings = [], heads = [];
   var stars = [], nebA, nebB, sprites = {};
-  var ground = { on: false, state: 'bare', prev: 'bare', k: 1, x: 1100, y: 566, rx: 285, ry: 50 };
+  var ground = { on: false, state: 'bare', prev: 'bare', k: 1, x: 1100, y: 592, rx: 300, ry: 60 };
   var aura = { on: false, x: 0, y: 0, hue: 225 };
   var shakeMag = 0, shakeEnd = 0, shakeDur = 1, sx = 0, sy = 0;
   var par = 0, parTarget = 0, T = 0, last = 0, shoot = null;
@@ -215,9 +215,9 @@
     var R = ground.rx, i, a, ph;
     c.save(); c.translate(ground.x, ground.y); c.scale(1, ground.ry / ground.rx); c.globalAlpha = al;
     if (st === 'bare') {
-      var g0 = c.createRadialGradient(0, 0, 0, 0, 0, R); g0.addColorStop(0, 'rgba(50,70,160,0.20)'); g0.addColorStop(1, 'rgba(30,40,110,0)');
+      var g0 = c.createRadialGradient(0, 0, 0, 0, 0, R); g0.addColorStop(0, 'rgba(60,84,190,0.30)'); g0.addColorStop(1, 'rgba(30,40,110,0)');
       c.fillStyle = g0; c.beginPath(); c.arc(0, 0, R, 0, TAU); c.fill();
-      c.strokeStyle = 'rgba(120,150,230,0.42)'; c.lineWidth = 1.5;
+      c.strokeStyle = 'rgba(130,160,240,0.6)'; c.lineWidth = 1.6;
       [0.94, 0.82, 0.5].forEach(function (k) { c.beginPath(); c.arc(0, 0, R * k, 0, TAU); c.stroke(); });
       for (i = 0; i < 36; i++) {
         a = i / 36 * TAU + T * 0.08;
@@ -229,16 +229,16 @@
       c.stroke();
     } else if (st === 'oil') {
       var g1 = c.createRadialGradient(0, 0, 0, 0, 0, R);
-      g1.addColorStop(0, 'rgba(6,3,10,0.98)'); g1.addColorStop(0.75, 'rgba(22,12,10,0.95)'); g1.addColorStop(0.93, 'rgba(70,44,14,0.75)'); g1.addColorStop(1, 'rgba(40,24,8,0)');
+      g1.addColorStop(0, 'rgba(22,12,30,0.97)'); g1.addColorStop(0.7, 'rgba(44,24,16,0.96)'); g1.addColorStop(0.92, 'rgba(130,80,24,0.9)'); g1.addColorStop(1, 'rgba(60,34,8,0)');
       c.fillStyle = g1; c.beginPath(); c.arc(0, 0, R, 0, TAU); c.fill();
       c.globalCompositeOperation = 'lighter';
       var hues = ['190,90,255', '255,170,60', '60,220,200', '255,90,160', '120,140,255'];
       for (i = 0; i < 7; i++) {
         var bx = Math.cos(T * (0.21 + i * 0.05) + i * 2.1) * R * 0.55, by = Math.sin(T * (0.17 + i * 0.04) + i * 1.3) * R * 0.5, br = R * (0.3 + 0.1 * Math.sin(T * 0.5 + i));
-        var g2 = c.createRadialGradient(bx, by, 0, bx, by, br); g2.addColorStop(0, 'rgba(' + hues[i % 5] + ',0.20)'); g2.addColorStop(1, 'rgba(' + hues[i % 5] + ',0)');
+        var g2 = c.createRadialGradient(bx, by, 0, bx, by, br); g2.addColorStop(0, 'rgba(' + hues[i % 5] + ',0.36)'); g2.addColorStop(1, 'rgba(' + hues[i % 5] + ',0)');
         c.fillStyle = g2; c.beginPath(); c.arc(bx, by, br, 0, TAU); c.fill();
       }
-      c.strokeStyle = 'rgba(255,190,90,0.38)'; c.lineWidth = 2;
+      c.strokeStyle = 'rgba(255,200,110,0.7)'; c.lineWidth = 2.5;
       c.beginPath(); c.arc(0, 0, R * 0.9, T * 0.3, T * 0.3 + 1.9); c.stroke();
       c.beginPath(); c.arc(0, 0, R * 0.74, -T * 0.2 + 3, -T * 0.2 + 4.2); c.stroke();
       for (i = 0; i < 7; i++) {
@@ -287,9 +287,9 @@
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     c.globalCompositeOperation = 'lighter';
     var sc = Math.max(W / 560, H / 340);
-    c.globalAlpha = 0.75 + 0.2 * Math.sin(T * 0.11);
+    c.globalAlpha = 0.5 + 0.2 * Math.sin(T * 0.11);
     c.drawImage(nebA, -40 * sc + Math.sin(T * 0.021) * 36 * sc - par * 0.02, -30 * sc + Math.cos(T * 0.017) * 24 * sc, 640 * sc, 400 * sc);
-    c.globalAlpha = 0.5 + 0.4 * Math.sin(T * 0.07 + 2);
+    c.globalAlpha = 0.36 + 0.3 * Math.sin(T * 0.07 + 2);
     c.drawImage(nebB, -40 * sc - Math.sin(T * 0.016 + 1) * 38 * sc - par * 0.04, -30 * sc - Math.cos(T * 0.013) * 26 * sc, 640 * sc, 400 * sc);
     c.globalAlpha = 1;
     for (var i = 0; i < stars.length; i++) {

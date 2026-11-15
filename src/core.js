@@ -522,6 +522,8 @@
       if (!sl) return;
       if (e.t === 'spell') {
         sl.el = e.el;
+        if (sl.from == null) sl.from = e.from;
+        sl.to = e.to;
         if (e.dmg) { sl.dmg += e.dmg; tot.dmg += e.dmg; }
         if (e.heal) { sl.heal += e.heal; tot.heal += e.heal; }
         if (e.ward) { sl.ward += e.ward; tot.ward += e.ward; }

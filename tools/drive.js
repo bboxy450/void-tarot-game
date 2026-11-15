@@ -97,8 +97,16 @@ async function playFight(n, opts) {
       await shot('spread-laid');
     }
     if (turns % 2) await clickSel('#btn-cast'); else await key('Enter', 'Enter', 13);
-    if (SHOTS && opts.castShots && turns <= opts.castShots) {
-      for (var k = 0; k < 16; k++) { await sleep(150); await shot('ch' + (st.chapter + 1) + '-t' + turns + '-cast-' + String(k).padStart(2, '0')); }
+    if (SHOTS) {                                            // frames during the cast, the Shade's answer and its death
+      var k = 0, dk = 0;
+      for (;;) {
+        await sleep(140);
+        var s2 = await ev('VT.screen==="fight" && VT.Fight.state() ? {busy:VT.Fight.state().busy, over:VT.Fight.state().over} : null');
+        if (!s2) break;
+        if (s2.over === 'win') { if (dk < 9 && opts.deathShots) await shot('ch' + (st.chapter + 1) + '-death-' + (dk++)); }
+        else if (opts.castShots && turns <= opts.castShots && k < 22) await shot('ch' + (st.chapter + 1) + '-t' + turns + '-cast-' + String(k++).padStart(2, '0'));
+        if (!s2.busy || s2.over === 'lose') break;
+      }
     }
     await waitFor('VT.screen!=="fight" || !VT.Fight.state() || !VT.Fight.state().busy || VT.Fight.state().over', 60000, 'turn to finish');
     if (await ev('VT.screen!=="fight"')) break;
@@ -157,7 +165,7 @@ async function main() {
     await clickSel('#btn-enter');
   }
   for (var n = 0; n < CHAPTERS; n++) {
-    var turns = await playFight(n, { hoverShot: n === 0 || args.start != null, castShots: n < 2 || args.start != null ? 2 : 0 });
+    var turns = await playFight(n, { hoverShot: n === 0 || args.start != null, castShots: n < 2 || args.start != null ? (+args.casts || 2) : 0, deathShots: n === 0 || args.start != null });
     await waitFor('VT.screen==="reward" && !VT.busy', 30000, 'reward screen');
     wins++;
     say('  won in ' + turns + ' turns');
