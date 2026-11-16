@@ -129,7 +129,7 @@ export class Spells {
       const j = () => rnd(-0.12, 0.12);
       if (b.el === 'fire') {
         fx.spawn({ x: b.x + j(), y: b.y + j(), z: b.z + j(), vx: rnd(-1, 1), vy: rnd(0.5, 2), vz: rnd(-1, 1), life: rnd(0.25, 0.5), size: rnd(0.35, 0.6), size1: 0.05, col: pick(C.fire.slice(0, 3)), col1: C.fire[4], mark: MARKS.flick, wid: 0.5, glow: 1 });
-        if (Math.random() < 0.3) fx.spawn({ x: b.x, y: b.y, z: b.z, vx: rnd(-0.5, 0.5), vy: rnd(0.6, 1.4), vz: rnd(-0.5, 0.5), life: rnd(0.8, 1.4), size: 0.3, size1: 0.8, col: C.smoke[1], col1: C.smoke[2], mark: MARKS.round, glow: 0.2, light: 0.5 });
+        if (Math.random() < 0.3) fx.spawn({ x: b.x, y: b.y, z: b.z, vx: rnd(-0.5, 0.5), vy: rnd(0.6, 1.4), vz: rnd(-0.5, 0.5), life: rnd(0.6, 1.1), size: 0.25, size1: 0.5, col: C.smoke[0], col1: C.smoke[1], mark: MARKS.dry, wid: 0.45, glow: 0.05, light: 0.2, dir: [1, 0.3, 0] });
       } else if (b.el === 'water') {
         fx.spawn({ x: b.x + j(), y: b.y + j(), z: b.z + j(), vx: rnd(-0.8, 0.8), vy: rnd(-1, 0.5), vz: rnd(-0.8, 0.8), life: rnd(0.2, 0.45), size: rnd(0.2, 0.42), size1: 0.04, col: pick(C.water.slice(0, 3)), col1: C.water[3], mark: MARKS.round, glow: 0.7, grav: 6 });
       } else if (b.el === 'air') {
@@ -336,7 +336,7 @@ export class Spells {
           const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
           this.fx.spawn({ x, y: this.floorAt(x, z) + 0.1, z, vx: rnd(-0.3, 0.3), vy: rnd(1.5, 3.2) * (0.6 + k), vz: rnd(-0.3, 0.3), life: rnd(0.35, 0.8), size: rnd(0.35, 0.75) * (0.6 + k * 0.6), size1: 0.05, col: pick(C.fire.slice(0, 3)), col1: C.fire[4], mark: MARKS.flick, wid: 0.45, glow: 1, dir: [0, 1, 0] });
         }
-        if (Math.random() < dt * 6) this.fx.spawn({ x: p.x + rnd(-1, 1), y: p.y + 1.5, z: p.z + rnd(-1, 1), vx: rnd(-0.3, 0.3), vy: rnd(1, 2), vz: rnd(-0.3, 0.3), life: rnd(1.5, 2.5), size: 0.5, size1: 1.4, col: C.smoke[0], col1: C.smoke[2], mark: MARKS.round, glow: 0.1, light: 0.6 });
+        if (Math.random() < dt * 10) this.fx.spawn({ x: p.x + rnd(-1, 1), y: p.y + 1.2, z: p.z + rnd(-1, 1), vx: rnd(-0.3, 0.3), vy: rnd(1, 2), vz: rnd(-0.3, 0.3), life: rnd(1.2, 2.2), size: 0.35, size1: 0.7, col: C.smoke[0], col1: C.smoke[1], mark: MARKS.dry, wid: 0.45, glow: 0.05, light: 0.15, spin: rnd(-1, 1), dir: [1, 0.4, 0] });
         // fire hurts what stands in it
         for (const f of this.foes.targets()) if (f.alive && Math.hypot(f.pos.x - p.x, f.pos.z - p.z) < p.r && Math.random() < dt * 1.5) this.foes.hit(f, 1, new THREE.Vector3(p.x, p.y, p.z), 'fire');
         const oil = this.patches.find((q) => q.kind === 'oil' && Math.hypot(q.x - p.x, q.z - p.z) < q.r + p.r * 0.7);
@@ -394,7 +394,7 @@ export class Spells {
       fx.spawn({ x: at.x, y: at.y + 0.3, z: at.z, vx: Math.cos(a) * s, vy: rnd(5, 12), vz: Math.sin(a) * s, grav: 18, life: rnd(0.9, 1.6), size: rnd(0.3, 0.6), size1: 0.2, col: pick([...C.earth, ...C.oil]), mark: MARKS.press, glow: 0, light: 1, floor: at.y + 0.05, spin: rnd(-8, 8), dir: [1, 0, 0] });
     }
     // smoke column
-    for (let i = 0; i < 140; i++) fx.spawn({ x: at.x + rnd(-1.5, 1.5), y: at.y + rnd(0.5, 3), z: at.z + rnd(-1.5, 1.5), vx: rnd(-1.2, 1.2), vy: rnd(2, 5.5), vz: rnd(-1.2, 1.2), drag: 0.8, life: rnd(1.6, 3.2), size: rnd(0.6, 1.1), size1: rnd(1.2, 2.2), col: mix(C.fire[3], C.smoke[0], 0.6), col1: pick(C.smoke), mark: pick([MARKS.dry, MARKS.press, MARKS.curve]), glow: 0.1, light: 0.8, wid: 0.5, spin: rnd(-1, 1), dir: [1, rnd(-0.5, 0.5), 0] });
+    for (let i = 0; i < 140; i++) fx.spawn({ x: at.x + rnd(-1.5, 1.5), y: at.y + rnd(0.5, 3), z: at.z + rnd(-1.5, 1.5), vx: rnd(-1.2, 1.2), vy: rnd(2, 5.5), vz: rnd(-1.2, 1.2), drag: 0.8, life: rnd(1.6, 3.2), size: rnd(0.5, 0.9), size1: rnd(0.9, 1.6), col: mix(C.fire[3], C.smoke[0], 0.6), col1: pick(C.smoke), mark: pick([MARKS.dry, MARKS.press, MARKS.curve]), glow: 0.05, light: 0.25, wid: 0.5, spin: rnd(-1, 1), dir: [1, rnd(-0.5, 0.5), 0] });
     // a shock ring along the ground
     for (let i = 0; i < 70; i++) {
       const a = (i / 70) * Math.PI * 2;

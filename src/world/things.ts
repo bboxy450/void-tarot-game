@@ -377,8 +377,9 @@ export function paintFigure(ctx: Ctx, x: number, y: number, z: number, face: num
 // the psychic's tent
 
 export function tentLamps() {
-  addLamp(TENT.x + Math.sin(TENT.face) * 0.5, groundHeight(TENT.x, TENT.z) + 1.2, TENT.z + Math.cos(TENT.face) * 0.5, 8, 0.7);
-  addLamp(TENT.x + Math.sin(TENT.face) * 3.4, groundHeight(TENT.x, TENT.z) + 2.4, TENT.z + Math.cos(TENT.face) * 3.4, 7, 0.5);
+  addLamp(TENT.x + Math.sin(TENT.face) * 0.5, groundHeight(TENT.x, TENT.z) + 1.2, TENT.z + Math.cos(TENT.face) * 0.5, 7, 0.45, hex('#ffb070'));
+  addLamp(TENT.x + Math.sin(TENT.face) * 1.0, groundHeight(TENT.x, TENT.z) + 1.0, TENT.z + Math.cos(TENT.face) * 1.0, 5, 0.5, hex('#8a90ff'));
+  addLamp(TENT.x + Math.sin(TENT.face) * 3.4, groundHeight(TENT.x, TENT.z) + 2.4, TENT.z + Math.cos(TENT.face) * 3.4, 6, 0.35);
 }
 
 export function paintTent(ctx: Ctx) {
@@ -392,7 +393,7 @@ export function paintTent(ctx: Ctx) {
   const stripe = (px: number, _py: number, pz: number, n: V3, rnd: number): RGB => {
     const a = Math.atan2(pz - z, px - x);
     const band = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 14) % 2;
-    return shadeColor(band ? 'robeViolet' : 'cloth', px, _py, pz, n, rnd, { bias: band ? 0.12 : 0.05, groundY: gy });
+    return shadeColor(band ? 'robeViolet' : 'gold', px, _py, pz, n, rnd, { bias: band ? 0.05 : -0.3, groundY: gy });
   };
   paintTube(ctx.solid, r, x, gy, z, R, 0.12, H, { ramp: 'robeViolet', len: 0.4, grainMode: 'down', cover: 2.4, arc: [frontAng + 0.55, frontAng + Math.PI * 2 - 0.55], color: stripe });
   ctx.under.add(new THREE.ConeGeometry(R * 0.98, H, 14, 1, true, face + 0.6, Math.PI * 2 - 1.2), place(x, gy + H / 2, z), 'robeViolet', -0.2);
@@ -418,7 +419,14 @@ export function paintTent(ctx: Ctx) {
     const k = r();
     ctx.glow.add(tx + q * Math.cos(a) * 0.22, gy + 0.95 + u * 0.22, tz + q * Math.sin(a) * 0.22, 0, 1, 0, null, 0.08, 0.06, mix(hex('#6a7cff'), hex('#e6d8ff'), k * k), { mark: MARKS.round, light: 0, glow: 1 });
   }
-  paintFigure(ctx, x - fx * 0.2, gy, z - fz * 0.2, face, { robe: 'robeTeal', hat: 'hood', seated: true });
+  paintFigure(ctx, x - fx * 0.2, gy, z - fz * 0.2, face, { robe: 'robeViolet', hat: 'hood', seated: true });
+  // her eyes catch the ball's light; candles at her side
+  for (const side of [-1, 1]) ctx.glow.add(x - fx * 0.2 + fx * 0.12 + Math.cos(face) * side * 0.05, gy + 0.5 + 0.75 + 0.18, z - fz * 0.2 + fz * 0.12 - Math.sin(face) * side * 0.05, 1, 0, 0, null, 0.04, 0.03, hex('#c8d4ff'), { mark: MARKS.round, light: 0, glow: 1 });
+  for (const [ox, oz] of [[1.2, 0.6], [-1.1, 0.8], [0.9, -0.9]]) {
+    const cx = x + ox, cz = z + oz;
+    paintTube(ctx.solid, r, cx, gy, cz, 0.05, 0.05, 0.35, { ramp: 'plaster', len: 0.05, grainMode: 'v', bias: 0.4 });
+    for (let i = 0; i < 5; i++) ctx.glow.add(cx, gy + 0.42 + i * 0.03, cz, 0, 1, 0, null, 0.07, 0.04, mix(LAMP, LAMP_HOT, i / 5), { mark: MARKS.flick, glow: 1, light: 0 });
+  }
   // a lantern on a pole by the door
   const lx = x + fx * 3.4 + Math.cos(face) * 1.6, lz = z + fz * 3.4 - Math.sin(face) * 1.6;
   paintTube(ctx.solid, r, lx, gy, lz, 0.06, 0.05, 2.6, { ramp: 'wood', len: 0.2, grainMode: 'v' });
