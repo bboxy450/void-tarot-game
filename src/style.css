@@ -1,0 +1,4 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: #08061a; }
+#view { position: fixed; inset: 0; display: block; }
+#pixels { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+#hud { position: fixed; inset: 0; pointer-events: none; font-family: "Cormorant Garamond", "Iowan Old Style", Palatino, Georgia, serif; color: #f3dfae; }
