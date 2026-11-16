@@ -174,9 +174,9 @@
       var line = stats ? 'Won in ' + stats.turns + (stats.turns === 1 ? ' turn' : ' turns') + (stats.seals ? ' · ' + stats.seals + (stats.seals === 1 ? ' Seal' : ' Seals') + ' broken' : '') + (stats.combos ? ' · ' + stats.combos + (stats.combos === 1 ? ' combo' : ' combos') : '') + ' · ' : '';
       s += '<div class="r-title">' + (straightToAltar ? 'The Altar' : 'The Shade yields') + '</div>';
       s += '<div class="r-sub">' + (straightToAltar ? '' : line + 'you rest and stand at ' + run.hp + ' of ' + Core.maxHp(ch) + ' life') + '</div>';
-      s += '<div class="r-ask" id="r-ask">' + (straightToAltar ? '' : 'Take one card into your deck') + '</div>';
+      s += '<div class="r-ask" id="r-ask">' + (straightToAltar ? '' : offer.length ? 'Take one card into your deck' : 'Every card of the deck is already yours') + '</div>';
       offer.forEach(function (id, i) { s += '<div class="r-desc" id="r-desc-' + i + '" style="left:' + (720 + (i - (offer.length - 1) / 2) * 330) + 'px"></div>'; });
-      s += '<button class="btn" id="btn-skip">Take nothing</button>';
+      s += '<button class="btn" id="btn-skip">' + (offer.length ? 'Take nothing' : 'Walk on') + '</button>';
       el.innerHTML = s;
       VT.setDeckCount();
       if (straightToAltar) { $('#btn-skip', el).style.display = 'none'; setTimeout(altar, 600 * VT.TS); return; }

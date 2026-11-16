@@ -9,14 +9,19 @@ var Core = require('../src/core.js');
 if (process.env.VT_T) Object.assign(Core.T, JSON.parse(process.env.VT_T));
 var RUNS = +process.argv[2] || 8, SEED = +process.argv[3] || 1;
 
+var lostCards = 0;
 function greedy(p) { return (p.kills ? 1e6 : 0) + p.total.dmg + p.total.ward * 0.01; }
 
 function playFight(run, score) {
-  var f = Core.startFight(run), guard = 0;
+  var f = Core.startFight(run), guard = 0, n0 = f.draw.length, purged = 0;
   while (!f.over && guard++ < 200) {
     Core.startTurn(f);
-    Core.cast(f, Core.suggest(f, score));
+    var pick = Core.suggest(f, score);
+    f.hand.forEach(function (c) { if (c.rev && pick.indexOf(c.uid) >= 0) purged++; });
+    Core.cast(f, pick);
     if (!f.over) Core.shadeTurn(f);
+    // every card instance ever made is in exactly one pile, or was purged
+    if (f.draw.length + f.discard.length + f.hand.length + f.keep.length !== f.uid - 1 - purged) lostCards++;
   }
   if (!f.over) f.over = 'lose';
   return f;
@@ -76,7 +81,8 @@ var checks = [
   ['greedy loses fights in the late game (50-77 below 85%)', (g.bands[5] + g.bands[6]) / 2 < 0.85],
   ['greedy is not walled (every band >= 35%)', Math.min.apply(null, g.bands) >= 0.35],
   ['thoughtful play wins (every band >= 85%)', Math.min.apply(null, t.bands) >= 0.85],
-  ['thoughtful beats greedy overall', t.losses < g.losses]
+  ['thoughtful beats greedy overall', t.losses < g.losses],
+  ['no card is ever lost or duplicated in a fight', lostCards === 0]
 ];
 var ok = true;
 console.log('');

@@ -101,7 +101,7 @@
     var el = h('div', 'card el-' + VT.elOf(inst) + (inst.rev ? ' rev' : '') + (o.down ? ' down' : ''));
     el.innerHTML = '<div class="card-lift"><div class="card-flip">' +
       '<div class="card-face card-front"><div class="card-art" style="background-image:url(' + VT.img(inst.id) + ')"></div>' + badgeHTML(inst) + '<div class="card-key"></div><div class="card-glow"></div></div>' +
-      '<div class="card-face card-back"></div></div></div>';
+      '<div class="card-face card-back"></div></div></div><div class="card-hit"></div>';
     el._inst = inst;
     el._p = { x: 0, y: 0, r: 0, s: 1 };
     // tilt toward the pointer while hovered (the CSS reads --rx / --ry)
@@ -237,6 +237,27 @@
     if (overlay._modal && !force) return;
     overlay.className = ''; VT.overlayOpen = false; overlay._modal = false; VT.hideTip();
   };
+  VT.showHelp = function () {
+    if (VT.busy) return;
+    if (VT.overlayOpen) { VT.closeOverlay(); return; }
+    AU.play('click');
+    var row = function (el, name, text) { return '<div class="help-row el-' + el + '"><div class="help-glyph">' + glyph(el, 30) + '</div><div><b>' + name + '</b> ' + text + '</div></div>'; };
+    overlay.innerHTML = '<div class="ov-box help"><div class="ov-title">The rules of the game</div>' +
+      '<div class="help-cols"><div>' +
+      row('fire', 'Wands are Fire.', 'Deal their number. On oil: <em class="combo-explosion">Explosion</em>.') +
+      row('water', 'Cups are Water.', 'A little damage, and they mend you. They leave the ground wet.') +
+      row('air', 'Swords are Air.', 'They charge wet ground. On charged ground: <em class="combo-zap">Zap</em>, and the Shade is shocked.') +
+      row('earth', 'Pentacles are Earth.', 'They ward you against the next blow, and leave oil.') +
+      '</div><div>' +
+      row('void', 'The Seal.', 'Numbered cards that add up to it exactly double the whole cast and stun the Shade. A low card is often the key.') +
+      row('void', 'Court cards', 'bend the card laid after them: it takes their element, multiplied. Order matters.') +
+      row('void', 'Trumps', 'are spells; hover to read them. The Fool always returns to your hand.') +
+      row('curse', 'Reversed cards', 'are curses. Lay one in the spread to purge it.') +
+      '</div></div><div class="help-keys">Click a card to lay it, again to take it back · <b>1–9</b> lay · <b>Enter</b> cast · <b>Esc</b> clear · <b>D</b> deck · <b>M</b> mute</div>' +
+      '<div class="ov-foot"><button class="btn" id="ov-close">Close</button></div></div>';
+    $('#ov-close').addEventListener('click', function () { AU.play('click'); VT.closeOverlay(); });
+    overlay.className = 'on'; overlay._modal = false; VT.overlayOpen = true;
+  };
   VT.showDeck = function () {
     if (VT.busy || VT.screen === 'title' || !VT.run) return;
     if (VT.overlayOpen) { VT.closeOverlay(); return; }
@@ -264,7 +285,8 @@
     for (var i = 0; i < n; i++) {
       run.chapter = i;
       var o = Core.rewardOptions(run);
-      if (i % 3 !== 2) run.deck.push(o[0]); else if (o[1] != null) run.deck.push(o[1]);
+      var pickId = i % 3 !== 2 ? o[0] : o[1];
+      if (pickId != null) run.deck.push(pickId);
       run.seen = { all: 1 };
     }
     run.chapter = n; run.hp = +params.get('hp') || Core.maxHp(n); run.phase = 'map';
@@ -290,6 +312,7 @@
     drawMute();
     mute.addEventListener('click', VT.toggleMute);
     deck.addEventListener('click', VT.showDeck);
+    $('#btn-help').addEventListener('click', VT.showHelp);
     menu.addEventListener('click', function () {
       if (VT.busy || VT.screen === 'title') return;
       AU.play('click'); VT.Journey.title();
@@ -324,6 +347,7 @@
 
     root.addEventListener('keydown', function (e) {
       if (e.key === 'm' || e.key === 'M') { VT.toggleMute(); return; }
+      if ((e.key === 'h' || e.key === 'H' || e.key === '?') && !(VT.overlayOpen && overlay._modal)) { VT.showHelp(); return; }
       if (VT.overlayOpen) { if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); var c = $('#ov-close'); if (c) c.click(); } return; }
       if (VT.busy) return;
       var k = VT.keys[VT.screen];

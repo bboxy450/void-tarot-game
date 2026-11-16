@@ -84,16 +84,19 @@ async function playFight(n, opts) {
         var idx = st.hand.indexOf(want[i]) + 1;
         await key(String(idx), 'Digit' + idx, 48 + idx); usedKeys = true;
       } else {
-        await clickSel('.card[data-uid="' + want[i] + '"]', -34);
+        await clickSel('.card[data-uid="' + want[i] + '"] .card-hit');
       }
       await sleep(Math.max(120, 420 * FAST));
       if (n === 0 && turns === 1 && i === 0) { await move(700, 300); }
     }
     var sp = await ev('VT.Fight.state().spread');
-    if (JSON.stringify(sp) !== JSON.stringify(want)) throw new Error('spread is ' + JSON.stringify(sp) + ' but clicked ' + JSON.stringify(want));
+    if (JSON.stringify(sp) !== JSON.stringify(want)) {
+      var dump = await ev('JSON.stringify({hand:VT.Fight.state().hand, core:VT.Fight.debug(), dom:Array.prototype.map.call(document.querySelectorAll("#cards .card"),function(e){var r=e.querySelector(".card-hit").getBoundingClientRect();return [e.getAttribute("data-uid"),e.className.replace("card ",""),Math.round(r.left),Math.round(r.right),Math.round(r.top),Math.round(r.bottom),e.style.zIndex]})})');
+      throw new Error('turn ' + turns + ': spread is ' + JSON.stringify(sp) + ' but clicked ' + JSON.stringify(want) + '\n' + dump);
+    }
     if (opts.hoverShot && turns === 1 && want.length) {
       var rest = st.hand.filter(function (u) { return want.indexOf(u) < 0; });
-      if (rest.length) { var p = await center('.card[data-uid="' + rest[0] + '"]'); await move(p[0] - 34, Math.min(p[1], H - 30)); await sleep(500); await shot('hover-tooltip'); await move(700, 560); await sleep(200); }
+      if (rest.length) { var p = await center('.card[data-uid="' + rest[0] + '"] .card-hit'); await move(p[0], Math.min(p[1], H - 30)); await sleep(500); await shot('hover-tooltip'); await move(700, 560); await sleep(200); }
       await shot('spread-laid');
     }
     if (turns % 2) await clickSel('#btn-cast'); else await key('Enter', 'Enter', 13);
@@ -133,7 +136,10 @@ async function main() {
   ws.onmessage = function (m) {
     var d = JSON.parse(m.data);
     if (d.id) { var p = pending[d.id]; delete pending[d.id]; if (p) { if (d.error) p.rej(new Error(p.method + ': ' + d.error.message)); else p.res(d.result); } return; }
-    if (d.method === 'Runtime.exceptionThrown') errors.push('exception: ' + (d.params.exceptionDetails.exception && d.params.exceptionDetails.exception.description || d.params.exceptionDetails.text));
+    if (d.method === 'Runtime.exceptionThrown') {
+      var x = d.params.exceptionDetails, fr = (x.stackTrace && x.stackTrace.callFrames || []).slice(0, 4).map(function (c) { return c.functionName + ' ' + c.url.split('/').pop() + ':' + (c.lineNumber + 1); }).join(' < ');
+      errors.push('exception: ' + (x.exception && x.exception.description || x.text).split('\n')[0] + (fr ? '  [' + fr + ']' : ''));
+    }
     if (d.method === 'Runtime.consoleAPICalled' && (d.params.type === 'error' || d.params.type === 'assert')) errors.push('console.error: ' + d.params.args.map(function (a) { return a.value || a.description; }).join(' '));
     if (d.method === 'Log.entryAdded' && d.params.entry.level === 'error') errors.push('log: ' + d.params.entry.text + ' ' + (d.params.entry.url || ''));
     if (d.method === 'Network.requestWillBeSent') { var u = d.params.request.url; requests.push(u); if (!/^(file:|data:|about:)/.test(u)) errors.push('non-local request: ' + u); }
@@ -172,7 +178,7 @@ async function main() {
     await waitFor('document.querySelectorAll(".card.r-card:not(.down)").length>=1', 20000, 'reward cards');
     await sleep(1400 * FAST + 300);
     if (n === 0) { await shot('reward'); var rp = await center('.card.r-card[data-offer="1"]'); await move(rp[0], rp[1]); await sleep(300); await shot('reward-hover'); }
-    await clickSel('.card.r-card[data-offer="0"]'); picks++;
+    await clickSel('.card.r-card[data-offer="0"] .card-hit'); picks++;
     await waitFor('VT.screen==="map" || VT.overlayOpen', 30000, 'map or altar');
     if (await ev('VT.overlayOpen')) {
       await sleep(600 * FAST + 200); await shot('altar');

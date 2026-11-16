@@ -186,6 +186,7 @@
       var k = i - (n - 1) / 2, el = els[u];
       el.classList.add('inhand'); el.classList.remove('inspread');
       el.style.zIndex = 30 + i;
+      el.style.setProperty('--hitw', (i === n - 1 ? VT.CW : Math.min(VT.CW, gap + 2)) + 'px');   // only the visible strip takes the pointer
       VT.moveCard(el, 720 + k * gap, 806 + k * k * 4.5, k * 3.4, 1, dur == null ? 380 : dur);
     });
     hand.forEach(function (u, i) { var k = $('.card-key', els[u]); if (k) k.textContent = i + 1; });
@@ -194,6 +195,7 @@
     spread.forEach(function (u, i) {
       var el = els[u];
       el.classList.remove('inhand'); el.classList.add('inspread');
+      el.style.removeProperty('--hitw');
       el.style.zIndex = 10 + i;
       VT.moveCard(el, slotX(i), SLOT_Y, 0, SLOT_S, dur == null ? 360 : dur);
     });
@@ -252,6 +254,7 @@
         extra += '<div class="tip-now"><span>In this spread</span> ' + slotText(pv.slots[i]) + '</div>';
       } else if (spread.length < f.slots) {
         var q = Core.preview(f, spread.concat([u])), sl = q.slots[spread.length];
+        if (!sl) return;
         extra += '<div class="tip-now"><span>Now</span> ' + slotText(sl) + (q.kills ? '. <em class="combo-kill">The Shade falls</em>' : '') + '</div>';
         if (!inst.rev && c.kind === 'court') extra += '<div class="tip-seal">Lay another card after it to empower that card instead.</div>';
         if (f.seal > 0 && !inst.rev && c.kind === 'pip') {
@@ -707,6 +710,7 @@
   VT.Fight = {
     enter: enter,
     piles: function () { return f ? { draw: f.draw, discard: f.discard.concat(f.hand) } : null; },
+    debug: function () { return f ? { hand: f.hand.map(function (c) { return c.uid; }), keep: f.keep.map(function (c) { return c.uid; }), turn: f.turn } : null; },
     // for the driver in tools/drive.js and for debugging from the console
     state: function () {
       if (!f || VT.screen !== 'fight') return null;

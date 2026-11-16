@@ -292,10 +292,10 @@
         if (got.length) { push(f, ev, { t: 'draw', cards: got }); got = []; }
         push(f, ev, { t: 'reshuffle', n: f.draw.length });
       }
-      got.push(f.draw.pop());
+      var c = f.draw.pop();
+      got.push(c); f.hand.push(c);
     }
     if (got.length) push(f, ev, { t: 'draw', cards: got });
-    got.forEach(function (c) { f.hand.push(c); });
   }
 
   function rollSeal(f) {

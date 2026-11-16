@@ -17,7 +17,7 @@ Each chapter you face the **Shade** of that chapter's card.
 
 Click a card to lay it, click it again to take it back. Keys: `1`–`9` lay or take back a
 card, `Enter`/`Space` cast, `Esc` clears the spread, `Backspace` takes back the last card,
-`D` shows your deck. Hover anything to read what it will do right now.
+`D` shows your deck, `H` the rules. Hover anything to read what it will do right now.
 
 ## The rules on one screen
 
@@ -78,7 +78,7 @@ over" on the title screen wipes it.
 ## Checks
 
 ```
-node tools/sim.js            # balance curve; exit 0 when the targets hold (takes a minute or two)
+node tools/sim.js            # balance curve; exit 0 when the targets hold (a few seconds; longer on a busy machine)
 node tools/drive.js          # 3 chapters by real clicks; exit 0 on zero script errors and zero non-local requests
 node tools/drive.js --shots=/tmp/void-tarot-shots   # same at normal speed, saving screenshots
 ```
