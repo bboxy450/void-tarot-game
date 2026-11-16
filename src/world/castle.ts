@@ -46,8 +46,8 @@ export function castleLamps() {
   addLamp(TABLE.x, Y + 1.4, TABLE.z, 7, 1.0);
   addLamp(-12, Y + 1.6, 12, 9, 1.0);
   addLamp(9, Y + 1.6, 22, 9, 1.0);
-  addLamp(-2.6, Y + 3, CASTLE.z0 - 1.6, 8, 0.9);
-  addLamp(2.6, Y + 3, CASTLE.z0 - 1.6, 8, 0.9);
+  addLamp(-2.6, Y + 3, CASTLE.z0 - 1.6, 7, 0.5);
+  addLamp(2.6, Y + 3, CASTLE.z0 - 1.6, 7, 0.5);
   addLamp(-2.6, Y + 3, CASTLE.z0 + 2.5, 7, 0.8);
   addLamp(2.6, Y + 3, CASTLE.z0 + 2.5, 7, 0.8);
   addLamp(0, Y + 2, KEEP.z0 - 1.5, 8, 0.9);
@@ -106,13 +106,13 @@ function keepWindows(): { p: V3; n: V3; w: number; h: number }[] {
 function glowRect(ctx: Ctx, p: V3, n: V3, w: number, h: number, hot = 0.5) {
   const { r } = ctx;
   const side: V3 = [n[2], 0, -n[0]];
-  const cnt = Math.round(w * h * 55) + 6;
+  const cnt = Math.round(w * h * 120) + 10;
   for (let i = 0; i < cnt; i++) {
     const a = r() - 0.5, b = r() - 0.5;
     // arched top
     if (b > 0.3 && Math.abs(a) > Math.sqrt(Math.max(0, 0.25 - (b - 0.3) * (b - 0.3) * 4)) * 0.9) continue;
     const col: RGB = mix(LAMP, LAMP_HOT, Math.min(1, r() * 0.8 + hot * 0.4 - b * 0.3));
-    ctx.glow.add(p[0] + side[0] * a * w + n[0] * 0.08, p[1] + b * h, p[2] + side[2] * a * w + n[2] * 0.08, 0, 1, 0, n, 0.2, 0.1, col, { mark: MARKS.press, light: 0, glow: 1 });
+    ctx.glow.add(p[0] + side[0] * a * w + n[0] * 0.08, p[1] + b * h, p[2] + side[2] * a * w + n[2] * 0.08, 0, 1, 0, n, 0.26, 0.15, col, { mark: MARKS.press, light: 0, glow: 1 });
   }
 }
 
@@ -121,7 +121,7 @@ export function paintCastle(ctx: Ctx) {
   const { x0, x1, z0, z1, wallH, wallT, gateW, gateH } = CASTLE;
   const L = 0.82;
   const inside = (x: number, y: number, z: number, n: V3, rnd: number, rampName: keyof typeof RAMP, bias = 0): RGB =>
-    shadeColor(rampName, x, y, z, n, rnd, { lit: courtyardSun(x + n[0] * 0.3, y, z + n[2] * 0.3), bias, sunK: 0.66 });
+    shadeColor(rampName, x, y, z, n, rnd, { lit: courtyardSun(x + n[0] * 0.3, y, z + n[2] * 0.3), bias, sunK: 0.52 });
   const stoneCol = (bias = 0) => (x: number, y: number, z: number, n: V3, rnd: number) => {
     const height = (y - Y) / 40;
     return inside(x, y, z, n, rnd, 'castle', bias - 0.06 + height * 0.1);
@@ -234,7 +234,6 @@ export function paintCastle(ctx: Ctx) {
   // the strings of lanterns and their cords
   for (const [x, y, z, c] of stringLanterns()) {
     for (let i = 0; i < 9; i++) ctx.glow.add(x + (r() - 0.5) * 0.22, y - 0.25 + (r() - 0.5) * 0.3, z + (r() - 0.5) * 0.22, 0, 1, 0, null, 0.14, 0.1, mix(c, LAMP_HOT, r() * 0.5), { mark: MARKS.round, light: 0, glow: 1 });
-    ctx.solid.add(x + 0.85, y + 0.12, z, 1, 0, 0, null, 1.8, 0.035, hex('#2a1e26'), { mark: MARKS.long, light: 0.4 });
   }
 }
 

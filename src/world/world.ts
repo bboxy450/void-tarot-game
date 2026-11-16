@@ -54,7 +54,7 @@ export function buildWorld(): World {
   castleLamps();
   for (const h of HOUSES) houseLamps(h);
   tentLamps();
-  for (const [x, z] of LAMP_POSTS) addLamp(x, groundHeight(x, z) + 2.8, z, 9, 0.9);
+  for (const [x, z] of LAMP_POSTS) addLamp(x, groundHeight(x, z) + 2.8, z, 9, 0.6);
   addLamp(STONES.x, groundHeight(STONES.x, STONES.z) + 2.5, STONES.z, 17, 0.8, hex('#8a70ff'));
   bakeTerrainShadow((x, z) => groundHeight(x, z));
 

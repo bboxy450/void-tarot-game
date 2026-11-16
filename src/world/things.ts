@@ -167,13 +167,13 @@ function paintWindow(ctx: Ctx, p: V3, n: V3, w: number, hgt: number) {
   // dark frame, then the glow inside
   paintRect(ctx.solid, r, [p[0] - side[0] * (w / 2 + 0.12) + n[0] * 0.01, p[1] - hgt / 2 - 0.12, p[2] - side[2] * (w / 2 + 0.12) + n[2] * 0.01], [side[0] * (w + 0.24), 0, side[2] * (w + 0.24)], [0, hgt + 0.24, 0], n, { ramp: 'wood', len: 0.22, cover: 2.4, bias: -0.25 });
   const hot = LAMP_HOT, lamp = LAMP;
-  const cnt = Math.round(w * hgt * 60);
+  const cnt = Math.round(w * hgt * 120);
   for (let i = 0; i < cnt; i++) {
     const a = r() - 0.5, b = r() - 0.5;
     const q: V3 = [p[0] + side[0] * a * w + n[0] * 0.06, p[1] + b * hgt, p[2] + side[2] * a * w + n[2] * 0.06];
     const k = r();
     const col: RGB = mix(mix(lamp, hot, k), [1, 0.85, 0.6], Math.max(0, b) * 0.4);
-    ctx.glow.add(q[0], q[1], q[2], 0, 1, 0, n, 0.16, 0.08, col, { mark: MARKS.press, light: 0, glow: 1 });
+    ctx.glow.add(q[0], q[1], q[2], 0, 1, 0, n, 0.2, 0.12, col, { mark: MARKS.press, light: 0, glow: 1 });
   }
   // mullions
   for (const m of [0]) {
@@ -393,24 +393,24 @@ export function paintTent(ctx: Ctx) {
   const stripe = (px: number, _py: number, pz: number, n: V3, rnd: number): RGB => {
     const a = Math.atan2(pz - z, px - x);
     const band = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 14) % 2;
-    return shadeColor(band ? 'robeViolet' : 'gold', px, _py, pz, n, rnd, { bias: band ? 0.05 : -0.3, groundY: gy });
+    return shadeColor(band ? 'robeViolet' : 'gold', px, _py, pz, n, rnd, { bias: band ? 0.0 : -0.32, groundY: gy });
   };
-  paintTube(ctx.solid, r, x, gy, z, R, 0.12, H, { ramp: 'robeViolet', len: 0.4, grainMode: 'down', cover: 2.4, arc: [frontAng + 0.55, frontAng + Math.PI * 2 - 0.55], color: stripe });
-  ctx.under.add(new THREE.ConeGeometry(R * 0.98, H, 14, 1, true, face + 0.6, Math.PI * 2 - 1.2), place(x, gy + H / 2, z), 'robeViolet', -0.2);
+  paintTube(ctx.solid, r, x, gy, z, R, 0.12, H, { ramp: 'robeViolet', len: 0.4, grainMode: 'down', cover: 2.4, arc: [frontAng + 0.45, frontAng + Math.PI * 2 - 0.45], color: stripe });
+  ctx.under.add(new THREE.ConeGeometry(R * 0.98, H, 14, 1, true, face + 0.5, Math.PI * 2 - 1.0), place(x, gy + H / 2, z), 'robeViolet', -0.2);
   ctx.under.add(new THREE.CircleGeometry(R, 14).rotateX(-Math.PI / 2), place(x, gy + 0.04, z), 'cloth', -0.1);
   // inside, a warm dark
-  paintTube(ctx.solid, r, x, gy, z, R * 0.9, 0.1, H * 0.95, { ramp: 'cloth', len: 0.35, grainMode: 'down', arc: [frontAng + Math.PI * 0.6, frontAng + Math.PI * 1.4], bias: -0.1 });
+  paintTube(ctx.solid, r, x, gy, z, R * 0.9, 0.1, H * 0.95, { ramp: 'robeViolet', len: 0.3, grainMode: 'down', arc: [frontAng + Math.PI * 0.5, frontAng + Math.PI * 1.5], bias: -0.22, color: (px, py, pz, n, rnd) => { const a = Math.atan2(pz - z, px - x); const band = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 14) % 2; return shadeColor(band ? 'robeViolet' : 'gold', px, py, pz, n, rnd, { bias: band ? -0.15 : -0.42, lit: 0 }); } });
   // flaps pulled aside
   for (const side of [-1, 1]) {
-    const a = frontAng + side * 0.6;
+    const a = frontAng + side * 0.5;
     for (let i = 0; i < 70; i++) {
       const t = r();
       const p: V3 = [x + Math.cos(a) * R * (1 - t) + Math.cos(a + side * 0.4) * 0.3, gy + t * H, z + Math.sin(a) * R * (1 - t) + Math.sin(a + side * 0.4) * 0.3];
-      stroke(ctx.solid, r, p, [Math.cos(a), 0.4, Math.sin(a)], [0, 1, 0], { ramp: 'cloth', len: 0.4, bias: 0.12, groundY: gy }, false);
+      stroke(ctx.solid, r, p, [Math.cos(a), 0.4, Math.sin(a)], [0, 1, 0], { ramp: 'robeViolet', len: 0.4, bias: 0.05, groundY: gy }, false);
     }
   }
   // a rug, a low table, the crystal ball, the seer
-  paintRect(ctx.ground, r, [x - 2, gy + 0.06, z - 2], [4, 0, 0], [0, 0, 4], [0, 1, 0], { ramp: 'cloth', len: 0.3, bias: 0.1, cover: 2.6 });
+  paintRect(ctx.ground, r, [x - 2, gy + 0.06, z - 2], [4, 0, 0], [0, 0, 4], [0, 1, 0], { ramp: 'robeViolet', len: 0.3, cover: 2.6, color: (px, py, pz, n, rnd) => { const k = (Math.floor((px - x) * 2.2) + Math.floor((pz - z) * 2.2)) & 1; return shadeColor(k ? 'robeViolet' : 'cloth', px, py, pz, n, rnd, { bias: k ? 0 : -0.15 }); } });
   const tx = x + fx * 1.0, tz = z + fz * 1.0;
   paintBox(ctx.solid, r, tx, gy, tz, 0.9, 0.9, 0.7, face, { ramp: 'cloth', len: 0.15, bias: 0.05 });
   ctx.under.add(new THREE.BoxGeometry(0.9, 0.7, 0.9), place(tx, gy + 0.35, tz, face), 'cloth', -0.1);

@@ -129,6 +129,14 @@ try {
   await tick(20);
   await shot('19-standing-stones');
 
+  // falling to no hearts: back at the gate
+  await g('G.teleport(30, -80, 0, 0)');
+  await g('(G.player.hearts = 1, game.hurt(1, G.player.pos.clone().add({x: 1, y: 0, z: 0, isVector3: true})), 1)');
+  check((await g('G.player.hearts')) === 0, 'struck to no hearts');
+  await tick(200);
+  const back = await g('({x: G.player.pos.x, z: G.player.pos.z, h: G.player.hearts})');
+  check(Math.hypot(back.x - 0, back.z - 1) < 2 && back.h === 5, `woke at the gate with full hearts (${back.x.toFixed(1)}, ${back.z.toFixed(1)})`);
+
   // frame time (headless: pessimistic)
   await g('G.teleport(0, 0.5, 0.0, -0.12)');
   const ms = await g('G.bench(60)');
@@ -144,6 +152,10 @@ try {
   await b.click(720, 450);
   await new Promise((r) => setTimeout(r, 2500));
   await shot('20-after-title');
+  // every sound once, with the audio unlocked by the click
+  const sounds = ['pickup', 'throw', 'cast_fire', 'cast_water', 'cast_air', 'cast_earth', 'trump', 'fire', 'water', 'air', 'earth', 'steam', 'charge', 'crackle', 'explosion', 'zap', 'sun', 'star', 'void', 'shade_cry', 'shade_hit', 'shade_die', 'shade_strike', 'hurt', 'seer', 'select', 'death', 'start'];
+  const state = await g(`(game.audio.ctx ? (${JSON.stringify(sounds)}.forEach((s) => game.audio.play(s, G.player.pos)), game.audio.step(true, false), game.audio.step(false, false), game.audio.step(false, true), game.audio.ctx.state) : 'no audio context')`);
+  check(state === 'running' || state === 'suspended', `audio context ${state}; ${sounds.length} sounds played`);
   await g('G.frameStats()');
   await new Promise((r) => setTimeout(r, 6000));
   const fs = await g('G.frameStats()');
