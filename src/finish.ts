@@ -53,7 +53,7 @@ void main() {
   // saturation held together
   float l2 = dot(c, vec3(0.299, 0.587, 0.114));
   c = mix(vec3(l2), c, 1.08);
-  c *= 1.0 + uDay * 0.15;
+  c = mix(c, c * vec3(1.18, 1.1, 0.88) + vec3(0.05, 0.035, 0.0), uDay);
   // rolloff of the brightest paint
   c = mix(c, 1.0 - (1.0 - c) * (1.0 - c) * 0.5 - 0.0, smoothstep(0.75, 1.3, c) * 0.6);
   c = min(c, vec3(1.0));

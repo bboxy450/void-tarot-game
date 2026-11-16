@@ -51,6 +51,7 @@ export function dabMaterial(kind: Kind): THREE.ShaderMaterial {
       uKeepFloor: { value: kind.keepFloor ?? 0.002 },
       uImpasto: { value: kind.impasto ?? 0.9 },
       uBroken: { value: kind.broken ?? 0.5 },
+      uTint: { value: new THREE.Vector4(0, 0, 0, 0) },
     },
     side: THREE.DoubleSide,
     alphaToCoverage: true,

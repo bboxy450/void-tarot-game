@@ -17,6 +17,8 @@ export const shared = {
   uLightPos: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4(0, -999, 0, 1)) },
   uLightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4(0, 0, 0, 0)) },
   uDay: { value: 0 }, // the Sun card: 0 dusk .. 1 bright
+  uPush: { value: new THREE.Vector4(0, -999, 0, 0) }, // a blast that bends grass and leaves: xyz, strength
+  uPushR: { value: 6 },
 };
 
 export const COMMON = /* glsl */ `
@@ -32,6 +34,8 @@ uniform float uMistDensity;
 uniform vec4 uLightPos[${MAX_LIGHTS}];
 uniform vec4 uLightCol[${MAX_LIGHTS}];
 uniform float uDay;
+uniform vec4 uPush;
+uniform float uPushR;
 
 // gusts cross the valley in bands (mirrored in wind.ts for the sound)
 float gustAt(vec2 xz, float t) {
@@ -83,6 +87,7 @@ uniform float uGust;
 uniform float uMistAmt;
 uniform float uDepthStep;
 uniform float uKeepFloor;
+uniform vec4 uTint;
 
 varying vec3 vCol;
 varying vec2 vUv;
@@ -102,6 +107,12 @@ void main() {
     vec2 push = uWindDir * (g * 0.9 + 0.06 * sin(uTime * 2.7 + seed * 40.0));
     vec3 flutter = vec3(sin(uTime * 3.1 + seed * 61.0), 0.4 * sin(uTime * 2.3 + seed * 17.0), cos(uTime * 2.9 + seed * 29.0));
     wp += (vec3(push.x, -0.15 * g, push.y) + flutter * 0.12 * (0.4 + g)) * bend * uGust;
+  }
+  if (bend > 0.0 && uPush.w > 0.0) {
+    vec3 dp = wp - uPush.xyz;
+    float f = max(0.0, 1.0 - length(dp) / uPushR);
+    vec2 away = normalize(dp.xz + 1e-4);
+    wp += vec3(away.x, -0.35, away.y) * f * f * uPush.w * bend;
   }
 
   vec3 toEye = cameraPosition - wp;
@@ -170,10 +181,10 @@ void main() {
   // colour: baked, then the moving lights, then the mist
   vec3 col = iCol.rgb;
   col = dynamicLight(wp, col, iMisc.z);
-  col *= 1.0 + uDay * 0.35 * iMisc.z;
+  col *= 1.0 + uDay * (0.25 + 0.35 * iMisc.z);
   float glow = iMisc.w;
   float m = mistAt(dist, wp.y) * uMistAmt * (1.0 - glow * 0.8) * (1.0 - uDay * 0.5);
-  vCol = mix(col, mistColor(-V), m);
+  vCol = mix(mix(col, mistColor(-V), m), uTint.rgb, uTint.a);
 
   float mark = floor(iMisc.x * 7.0 + 0.5);
   vMark = mark;
@@ -224,7 +235,7 @@ void main() {
   vec3 toEye = cameraPosition - wp;
   float dist = length(toEye);
   vec3 col = dynamicLight(wp, color, 1.0);
-  col *= 1.0 + uDay * 0.35;
+  col *= 1.0 + uDay * 0.55;
   vCol = mix(col, mistColor(-toEye / dist), mistAt(dist, wp.y) * uMistAmt * (1.0 - uDay * 0.5));
   gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
 }
