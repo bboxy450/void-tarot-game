@@ -10,10 +10,10 @@ const SH = Math.hypot(SUN[0], SUN[2]);
 const SUN_TAN = SUN[1] / SH; // rise over run toward the sun
 const SX = SUN[0] / SH, SZ = SUN[2] / SH;
 
-export interface Lamp { x: number; y: number; z: number; r: number; k: number }
+export interface Lamp { x: number; y: number; z: number; r: number; k: number; col: RGB }
 export const LAMPS: Lamp[] = [];
-export function addLamp(x: number, y: number, z: number, r: number, k: number) {
-  LAMPS.push({ x, y, z, r, k });
+export function addLamp(x: number, y: number, z: number, r: number, k: number, col: RGB = LAMP) {
+  LAMPS.push({ x, y, z, r, k, col });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -91,14 +91,15 @@ export function sunAt(x: number, y: number, z: number, groundY: number): number 
   return lookup(x + j, z - j) * (1 - lift) + lift * lookup(x - SX * (y - groundY) / SUN_TAN, z - SZ * (y - groundY) / SUN_TAN);
 }
 
-export function lampAt(x: number, y: number, z: number): number {
-  let k = 0;
+/** Lamplight reaching a point: summed colour times strength. */
+export function lampAt(x: number, y: number, z: number): RGB {
+  const k: RGB = [0, 0, 0];
   for (const l of LAMPS) {
     const dx = x - l.x, dy = y - l.y, dz = z - l.z;
     if (Math.abs(dx) > l.r || Math.abs(dz) > l.r || Math.abs(dy) > l.r) continue;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     const f = 1 - d / l.r;
-    if (f > 0) k += f * f * l.k;
+    if (f > 0) { const w = f * f * l.k; k[0] += l.col[0] * w; k[1] += l.col[1] * w; k[2] += l.col[2] * w; }
   }
   return k;
 }
@@ -121,7 +122,9 @@ export function shadeColor(r: keyof typeof RAMP, x: number, y: number, z: number
 }
 
 export function warm(c: RGB, x: number, y: number, z: number): RGB {
-  const k = Math.min(lampAt(x, y, z), 1.3);
-  if (k <= 0.001) return c;
-  return [c[0] + (c[0] * 1.8 + 0.1) * LAMP[0] * k, c[1] + (c[1] * 1.8 + 0.06) * LAMP[1] * k, c[2] + (c[2] * 1.2 + 0.02) * LAMP[2] * k];
+  const L = lampAt(x, y, z);
+  const m = Math.max(L[0], L[1], L[2]);
+  if (m <= 0.001) return c;
+  const s = m > 1.3 ? 1.3 / m : 1;
+  return [c[0] + (c[0] * 1.8 + 0.1) * L[0] * s, c[1] + (c[1] * 1.8 + 0.06) * L[1] * s, c[2] + (c[2] * 1.4 + 0.04) * L[2] * s];
 }

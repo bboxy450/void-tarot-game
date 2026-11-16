@@ -76,6 +76,13 @@ export class Game {
   // ------------------------------------------------------------------------------------------
   // input
 
+  private lock() {
+    try {
+      const r = this.o.canvas.requestPointerLock?.() as unknown as Promise<void> | undefined;
+      r?.catch?.(() => {});
+    } catch { /* not allowed here (headless, iframe) */ }
+  }
+
   private bindInput() {
     const { canvas } = this.o;
     const begin = () => {
@@ -85,14 +92,14 @@ export class Game {
       this.audio.unlock();
       this.audio.play('start');
       this.hud.once('walk', 'WASD to walk · move the mouse to look');
-      canvas.requestPointerLock?.();
+      this.lock();
     };
     this.hud.title.addEventListener('click', begin);
     canvas.addEventListener('click', () => {
       this.audio.unlock();
       if (!this.started) return begin();
       if (this.hud.readingOpen) return this.hud.hideReading();
-      if (!this.locked) canvas.requestPointerLock?.();
+      if (!this.locked) this.lock();
     });
     this.hud.reading.addEventListener('click', () => this.hud.hideReading());
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === canvas; });

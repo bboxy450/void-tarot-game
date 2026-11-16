@@ -283,8 +283,8 @@ export function paintStone(ctx: Ctx, x: number, z: number, hgt: number, w: numbe
   const d = w * 0.55;
   const L = 0.32 / Math.sqrt(ctx.detail(x, z));
   // a tapered slab: two boxes, the top narrower
-  paintBox(ctx.solid, r, x, gy, z, w, d, hgt * 0.65, rot, { bias: 0.1, ramp: 'stone', len: L, sideGrain: 'v', jitter: 0.3, groundY: gy + 0.5, marks: [MARKS.press, MARKS.dry, MARKS.long, MARKS.round], top: false });
-  paintBox(ctx.solid, r, x, gy + hgt * 0.65, z, w * 0.8, d * 0.85, hgt * 0.35, rot, { bias: 0.12, ramp: 'stone', len: L, sideGrain: 'v', jitter: 0.3, groundY: gy + 0.5, marks: [MARKS.press, MARKS.dry, MARKS.round] });
+  paintBox(ctx.solid, r, x, gy, z, w, d, hgt * 0.65, rot, { bias: 0.2, ramp: 'stone', len: L, sideGrain: 'v', jitter: 0.3, groundY: gy + 0.5, marks: [MARKS.press, MARKS.dry, MARKS.long, MARKS.round], top: false });
+  paintBox(ctx.solid, r, x, gy + hgt * 0.65, z, w * 0.72, d * 0.8, hgt * 0.35, rot, { bias: 0.24, ramp: 'stone', len: L, sideGrain: 'v', jitter: 0.3, groundY: gy + 0.5, marks: [MARKS.press, MARKS.dry, MARKS.round] });
   ctx.under.add(new THREE.BoxGeometry(w * 0.95, hgt * 0.65, d * 0.95), place(x, gy + hgt * 0.325, z, rot), 'stone', -0.12);
   ctx.under.add(new THREE.BoxGeometry(w * 0.75, hgt * 0.35, d * 0.8), place(x, gy + hgt * 0.825, z, rot), 'stone', -0.12);
   // lichen
@@ -327,7 +327,9 @@ export function paintFigure(ctx: Ctx, x: number, y: number, z: number, face: num
   const L = 0.1;
   // robe: body from the seat (or ground) up
   const bodyH = st.seated ? 0.75 : 1.45;
-  paintTube(ctx.solid, r, x, seatY - (st.seated ? 0.5 : 0), z, st.seated ? 0.42 : 0.38, 0.2, bodyH + (st.seated ? 0.5 : 0), { ramp: st.robe, len: L * 1.4, grainMode: 'v', cover: 2.6, jitter: 0.2, light: 1 });
+  paintTube(ctx.solid, r, x, seatY - (st.seated ? 0.5 : 0), z, st.seated ? 0.44 : 0.4, 0.27, bodyH + (st.seated ? 0.5 : 0), { ramp: st.robe, len: L * 1.4, grainMode: 'v', cover: 2.6, jitter: 0.2, light: 1 });
+  // a collar of gold at the shoulders
+  for (let i = 0; i < 26; i++) { const a = (i / 26) * Math.PI * 2; ctx.glow.add(x + Math.cos(a) * 0.24, seatY + bodyH - 0.04, z + Math.sin(a) * 0.24, -Math.sin(a), 0, Math.cos(a), null, 0.09, 0.05, ramp(RAMP.gold, 0.55 + (i % 3) * 0.12), { mark: MARKS.press, light: 1, glow: 0.2 }); }
   ctx.under.add(new THREE.CylinderGeometry(0.19, st.seated ? 0.4 : 0.36, bodyH + (st.seated ? 0.5 : 0), 8), place(x, seatY - (st.seated ? 0.5 : 0) + (bodyH + (st.seated ? 0.5 : 0)) / 2, z), st.robe, -0.1);
   if (st.seated) {
     // lap and knees forward
@@ -339,7 +341,7 @@ export function paintFigure(ctx: Ctx, x: number, y: number, z: number, face: num
     const sx = Math.cos(face) * side * 0.26, sz = -Math.sin(face) * side * 0.26;
     for (let t = 0; t < 1; t += 0.2) {
       const p: V3 = [x + sx * (1 - t * 0.4) + fx * t * 0.42, top - 0.2 - t * 0.28, z + sz * (1 - t * 0.4) + fz * t * 0.42];
-      stroke(ctx.solid, r, p, [0, 0, 0], [fx, -0.4, fz], { ramp: st.robe, len: 0.18, wid: 0.12, bias: 0.05 }, false);
+      stroke(ctx.solid, r, p, [0, 0, 0], [fx, -0.4, fz], { ramp: st.robe, len: 0.24, wid: 0.17, bias: 0.08 }, false);
     }
     const hp: V3 = [x + sx * 0.6 + fx * 0.46, top - 0.5, z + sz * 0.6 + fz * 0.46];
     stroke(ctx.solid, r, hp, [0, 0, 0], [fx, 0, fz], { ramp: 'skin', len: 0.1, wid: 0.08, bias: 0.15 }, false);

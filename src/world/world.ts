@@ -6,7 +6,7 @@ import { bakeTerrainShadow, addLamp } from '../paint/light';
 import { rng, fbm, smooth } from '../paint/util';
 import { MARKS } from '../paint/brush';
 import { LAMP, LAMP_HOT } from '../paint/palette';
-import { mix } from '../paint/util';
+import { mix, hex } from '../paint/util';
 import { HOUSES, POND, STONES, TENT, PATHS, groundHeight, pathInfo, hillMask, reachOf, streamDist } from './layout';
 import { paintTree, paintFir, paintBush, paintHouse, paintStone, houseLamps, paintTent, tentLamps } from './things';
 import { castleLamps, paintCastle, FLAMES } from './castle';
@@ -55,6 +55,7 @@ export function buildWorld(): World {
   for (const h of HOUSES) houseLamps(h);
   tentLamps();
   for (const [x, z] of LAMP_POSTS) addLamp(x, groundHeight(x, z) + 2.8, z, 9, 0.9);
+  addLamp(STONES.x, groundHeight(STONES.x, STONES.z) + 2.5, STONES.z, 17, 0.8, hex('#8a70ff'));
   bakeTerrainShadow((x, z) => groundHeight(x, z));
 
   paintCastle(ctx);
@@ -64,7 +65,7 @@ export function buildWorld(): World {
   for (let i = 0; i < 9; i++) {
     const a = (i / 9) * Math.PI * 2 + 0.2;
     const x = STONES.x + Math.cos(a) * STONES.r, z = STONES.z + Math.sin(a) * STONES.r;
-    paintStone(ctx, x, z, 2.6 + r() * 2.2 + (i === 0 ? 1.4 : 0), 1.3 + r() * 0.6, -a + Math.PI / 2 + (r() - 0.5) * 0.3);
+    paintStone(ctx, x, z, 3.4 + r() * 2.4 + (i === 0 ? 1.4 : 0), 1.5 + r() * 0.7, -a + Math.PI / 2 + (r() - 0.5) * 0.3);
   }
   paintStone(ctx, STONES.x, STONES.z, 1.0, 2.4, 0.4); // the altar stone in the middle
   // lamp posts

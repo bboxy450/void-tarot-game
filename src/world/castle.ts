@@ -8,7 +8,7 @@ import { place } from '../paint/under';
 import { mix, ramp, hex, type RGB } from '../paint/util';
 import { CASTLE, PLATEAU_Y, TABLE } from './layout';
 import { paintBox, paintRect, paintTube, type V3 } from './surfaces';
-import { paintFigure } from './things';
+import { paintFigure, paintTree, paintBush } from './things';
 import type { Ctx } from './ctx';
 
 const Y = PLATEAU_Y;
@@ -51,7 +51,22 @@ export function castleLamps() {
   addLamp(-2.6, Y + 3, CASTLE.z0 + 2.5, 7, 0.8);
   addLamp(2.6, Y + 3, CASTLE.z0 + 2.5, 7, 0.8);
   addLamp(0, Y + 2, KEEP.z0 - 1.5, 8, 0.9);
+  stringLanterns().forEach(([x, y, z, c], i) => { if (i % 3 === 1) addLamp(x, y - 0.5, z, 7, 0.35, c); });
   for (const w of keepWindows()) addLamp(w.p[0] + w.n[0] * 1.5, w.p[1], w.p[2] + w.n[2] * 1.5, w.h > 2 ? 8 : 6, w.h > 2 ? 0.7 : 0.45);
+}
+
+/** Strings of small lanterns across the courtyard: [x, y, z, colour] */
+export function stringLanterns(): [number, number, number, RGB][] {
+  const out: [number, number, number, RGB][] = [];
+  const cols = [hex('#ffcf6a'), hex('#ff9a6a'), hex('#d8a0ff'), hex('#ffe9a0')];
+  for (const z of [11, 19.5]) {
+    for (let x = CASTLE.x0 + 1.5; x <= CASTLE.x1 - 1.5; x += 1.7) {
+      const f = (x - CASTLE.x0) / (CASTLE.x1 - CASTLE.x0);
+      const y = Y + 7.6 - Math.sin(f * Math.PI) * 2.2;
+      out.push([x, y, z + Math.sin(x * 0.7) * 0.2, cols[Math.round(x * 3.3) & 3]]);
+    }
+  }
+  return out;
 }
 
 export const FLAMES: V3[] = [
@@ -208,6 +223,19 @@ export function paintCastle(ctx: Ctx) {
   for (const p of FLAMES.slice(2)) paintTube(solid, r, p[0], p[1] - 0.9, p[2], 0.06, 0.09, 0.9, { ramp: 'wood', len: 0.12, grainMode: 'v' });
 
   paintCourt(ctx);
+  // an old tree in the courtyard, and a little green at the walls
+  paintTree(ctx, 11.5, 13.5, 1.15, 'autumn');
+  for (const [bx, bz] of [[15.5, 7.5], [-15.5, 26], [-15.8, 7.2], [15.6, 27]] as [number, number][]) paintBush(ctx, bx, bz, 1.1, true);
+  for (const [bx, bz] of [[14.5, 22], [15.2, 23.4], [-14.8, 15]] as [number, number][]) {
+    paintTube(ctx.solid, r, bx, Y, bz, 0.42, 0.42, 1.1, { ramp: 'wood', len: 0.18, grainMode: 'v', bias: 0.05 });
+    paintTube(ctx.solid, r, bx, Y + 0.25, bz, 0.45, 0.45, 0.08, { ramp: 'wood', len: 0.1, grainMode: 'h', color: () => hex('#2a2430') });
+    ctx.colliders.push({ kind: 'circle', x: bx, z: bz, r: 0.5 });
+  }
+  // the strings of lanterns and their cords
+  for (const [x, y, z, c] of stringLanterns()) {
+    for (let i = 0; i < 9; i++) ctx.glow.add(x + (r() - 0.5) * 0.22, y - 0.25 + (r() - 0.5) * 0.3, z + (r() - 0.5) * 0.22, 0, 1, 0, null, 0.14, 0.1, mix(c, LAMP_HOT, r() * 0.5), { mark: MARKS.round, light: 0, glow: 1 });
+    ctx.solid.add(x + 0.85, y + 0.12, z, 1, 0, 0, null, 1.8, 0.035, hex('#2a1e26'), { mark: MARKS.long, light: 0.4 });
+  }
 }
 
 function paintCourt(ctx: Ctx) {

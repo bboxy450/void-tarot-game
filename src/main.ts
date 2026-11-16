@@ -136,7 +136,7 @@ requestAnimationFrame(frame);
   set manual(v: boolean) { manual = v; },
   get manual() { return manual; },
   tick: (dt = 1 / 60, n = 1) => { for (let i = 0; i < n; i++) tick(dt); },
-  teleport: (x: number, z: number, yaw = 0, pitch = -0.04) => { player.place(x, z, yaw, pitch); },
+  teleport: (x: number, z: number, yaw = 0, pitch = -0.04) => { const [cx, cz] = player.collide(x, z); player.place(cx, cz, yaw, pitch); },
   look: (yaw: number, pitch = -0.04) => { player.yaw = yaw; player.pitch = pitch; },
   start: () => player.place(START.x, START.z, START.yaw),
   gate: () => player.place(GATE.x, GATE.z, GATE.yaw),

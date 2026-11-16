@@ -6,10 +6,10 @@ import { join } from 'node:path';
 
 const CHROME = process.env.CHROME ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
-export async function launch({ port = 9333, width = 1440, height = 900, gl = 'metal' } = {}) {
+export async function launch({ port = 9333, width = 1440, height = 900, gl = 'metal', headless = true } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'vt-chrome-'));
   const args = [
-    '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, `--window-size=${width},${height}`,
+    ...(headless ? ['--headless=new'] : []), `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`, `--window-size=${width},${height}`,
     '--no-first-run', '--no-default-browser-check', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
     '--autoplay-policy=no-user-gesture-required',
   ];

@@ -85,7 +85,7 @@ try {
   check((await g('game.spells.patches.filter(p => p.kind === "charged").length')) === 0, 'touching the charged water zapped it');
 
   // every element thrown from the hand
-  await g('G.teleport(30, -40, 0.4, -0.05)');
+  await g('G.teleport(-26, -60, 0.9, -0.06)');
   for (const c of [22, 36, 50, 64]) { await g(`G.select(${c}), G.cast()`); await tick(30); }
   await shot('12-cast-elements');
 
@@ -117,7 +117,9 @@ try {
   await tick(20);
   await shot('17-seer-tent');
   await key('KeyE', 'e', 69);
-  await tick(90);
+  await tick(30);
+  await new Promise((r) => setTimeout(r, 2600));
+  await tick(2);
   await shot('18-reading');
   check(await g('game.hud.readingOpen'), 'the seer reads three cards');
   await key('KeyE', 'e', 69);
@@ -133,6 +135,19 @@ try {
   console.log('bench ms/frame at the gate', ms.toFixed(2));
   const ms2 = await g('(G.teleport(12, -96, 3.0, 0.1), G.bench(60))');
   console.log('bench ms/frame in the village', ms2.toFixed(2));
+
+  // the title, then the game running on its own clock: frame times from requestAnimationFrame
+  await b.goto(base);
+  await b.waitFor('!!(window.__game && window.__game.game.cards.ready)', 120000);
+  await new Promise((r) => setTimeout(r, 1500));
+  await shot('00-title');
+  await b.click(720, 450);
+  await new Promise((r) => setTimeout(r, 2500));
+  await shot('20-after-title');
+  await g('G.frameStats()');
+  await new Promise((r) => setTimeout(r, 6000));
+  const fs = await g('G.frameStats()');
+  console.log('rAF frame ms (headless, adaptive scale): avg', fs.avg.toFixed(1), 'p50', fs.p50.toFixed(1), 'p95', fs.p95.toFixed(1), 'scale', fs.scale.toFixed(2), 'frames', fs.n);
 } catch (e) {
   fails.push(String(e));
   console.error(e);
