@@ -136,8 +136,8 @@ function cardHandSprites(): { back: HTMLCanvasElement; front: HTMLCanvasElement;
   const back = new Px(90, 140);
   // fingers behind the card: they show past its right edge
   for (let i = 0; i < 3; i++) {
-    back.ellipse(60, 46 + i * 8, 5, 3.6, P.skin[i % 2 ? 1 : 2]);
-    back.line(56, 49.5 + i * 8, 64, 49.5 + i * 8, P.skin[0]);
+    back.ellipse(63, 40 + i * 8, 5, 3.6, P.skin[i % 2 ? 1 : 2]);
+    back.line(59, 43.5 + i * 8, 67, 43.5 + i * 8, P.skin[0]);
   }
   back.outline(P.out);
   const front = new Px(90, 140);
@@ -205,7 +205,7 @@ export class Hands {
   cardSprite(index: number, img: HTMLImageElement): HTMLCanvasElement {
     const got = this.cardPx.get(index);
     if (got) return got;
-    const w = 34, h = 52;
+    const w = 40, h = 60;
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     const ctx = c.getContext('2d')!;
@@ -302,10 +302,10 @@ export class Hands {
         // the card's aura when it is ready to cast
         if (o.card.ready > 0.99) {
           ctx.fillStyle = o.card.glow;
-          for (let y = -3; y < 56; y++) for (let x = -3; x < 37; x++) {
-            const inside = x >= 0 && y >= 0 && x < 34 && y < 52;
+          for (let y = -3; y < 64; y++) for (let x = -3; x < 43; x++) {
+            const inside = x >= 0 && y >= 0 && x < 40 && y < 60;
             if (inside) continue;
-            if (BAYER[((y + 64) & 3) * 4 + ((x + 64) & 3)] < 0.5 + 0.25 * Math.sin(t * 6 + (x + y) * 0.4)) ctx.fillRect(rx + 22 + x, ry + 24 + y + rise, 1, 1);
+            if (BAYER[((y + 64) & 3) * 4 + ((x + 64) & 3)] < 0.5 + 0.25 * Math.sin(t * 6 + (x + y) * 0.4)) ctx.fillRect(rx + 20 + x, ry + 20 + y + rise, 1, 1);
           }
         }
         ctx.save();
@@ -313,7 +313,7 @@ export class Hands {
         ctx.rect(rx + 10, ry, 80, 120);
         ctx.clip();
         ctx.globalAlpha = 0.45 + 0.55 * o.card.ready;
-        ctx.drawImage(cs, rx + 22, ry + 24 + rise);
+        ctx.drawImage(cs, rx + 20, ry + 20 + rise);
         ctx.restore();
       }
       ctx.drawImage(showCard ? this.hand.front : this.hand.open, rx, ry);

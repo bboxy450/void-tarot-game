@@ -224,7 +224,7 @@ export function paintCastle(ctx: Ctx) {
 
   paintCourt(ctx);
   // an old tree in the courtyard, and a little green at the walls
-  paintTree(ctx, 11.5, 13.5, 1.15, 'autumn');
+  paintTree(ctx, 5.5, 10.5, 1.1, 'autumn');
   for (const [bx, bz] of [[15.5, 7.5], [-15.5, 26], [-15.8, 7.2], [15.6, 27]] as [number, number][]) paintBush(ctx, bx, bz, 1.1, true);
   for (const [bx, bz] of [[14.5, 22], [15.2, 23.4], [-14.8, 15]] as [number, number][]) {
     paintTube(ctx.solid, r, bx, Y, bz, 0.42, 0.42, 1.1, { ramp: 'wood', len: 0.18, grainMode: 'v', bias: 0.05 });
