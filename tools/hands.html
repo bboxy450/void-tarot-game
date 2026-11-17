@@ -4,7 +4,8 @@
 <style>body{margin:0;background:#20163a}canvas{image-rendering:pixelated;display:block}</style></head>
 <body><canvas id="c"></canvas>
 <script type="module">
-const { fistSprite, cardHandSprites } = await import('/src/ui/hands.ts?bench=' + Date.now());
+const { fistSprite, cardHandSprites, FIST_PAD: _p } = await import('/src/ui/hands.ts?bench=' + Date.now());
+const FIST_PAD = _p;
 const img = new Image();
 img.src = '/cards/01-magician.jpg';
 await img.decode();
@@ -16,14 +17,14 @@ g.fillStyle = '#d8a83a'; g.strokeStyle = '#d8a83a'; g.strokeRect(0.5, 0.5, 79, 1
 const S = 3, cw = 180, ch = 280;
 const c = document.getElementById('c'); c.width = 4 * cw * S; c.height = ch * S + 300; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
 const bgs = ['#3a2c5a', '#5a6a3a', '#b08050', '#2a1e3a'];
-const panel = (i, draw) => { x.fillStyle = bgs[i]; x.fillRect(i * cw * S, 0, cw * S, ch * S); x.save(); x.translate(i * cw * S, 0); x.scale(S, S); draw(); x.restore(); };
-const staff = () => { x.fillStyle = '#5a3820'; x.fillRect(74, 0, 13, 280); x.fillStyle = '#86582e'; x.fillRect(77, 0, 3, 280); };
-panel(0, () => { staff(); x.drawImage(fist, 0, 0); });
+const panel = (i, draw) => { x.save(); x.beginPath(); x.rect(i * cw * S, 0, cw * S, ch * S); x.clip(); x.fillStyle = bgs[i]; x.fillRect(i * cw * S, 0, cw * S, ch * S); x.translate(i * cw * S, 0); x.scale(S, S); draw(); x.restore(); };
+const staff = () => { x.fillStyle = '#5a3820'; x.fillRect(84, 0, 13, 120); x.fillStyle = '#86582e'; x.fillRect(87, 0, 3, 120); };
+panel(0, () => { staff(); x.drawImage(fist, -FIST_PAD + 10, 0); });
 panel(1, () => { x.drawImage(hand.back, 0, 0); x.drawImage(card, 40, 40); x.drawImage(hand.front, 0, 0); });
 panel(2, () => { x.drawImage(hand.open, 0, 0); });
-panel(3, () => { staff(); x.drawImage(fist, 0, 0); });
+panel(3, () => { staff(); x.drawImage(fist, -FIST_PAD + 10, 0); });
 // game size: 1 sprite pixel = 2 screen pixels at a 900px tall window... shown at 1x and 2x
 x.fillStyle = '#4a3a62'; x.fillRect(0, ch * S, c.width, 300);
-x.save(); x.translate(20, ch * S + 10); staff(); x.drawImage(fist, 0, 0); x.drawImage(hand.back, 160, 0); x.drawImage(card, 200, 40); x.drawImage(hand.front, 160, 0); x.drawImage(hand.open, 340, 0); x.restore();
+x.save(); x.translate(20, ch * S + 10); staff(); x.drawImage(fist, -FIST_PAD + 10, 0); x.drawImage(hand.back, 160, 0); x.drawImage(card, 200, 40); x.drawImage(hand.front, 160, 0); x.drawImage(hand.open, 340, 0); x.restore();
 window.ready = true;
 </script></body></html>
