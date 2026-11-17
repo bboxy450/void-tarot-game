@@ -110,6 +110,8 @@ tools/cdp.js                   a small DevTools-protocol client for headless Chr
 tools/drive.js                 the driver: plays the game headless and writes screenshots
 tools/look.js                  screenshots from given places
 tools/perf.js                  frame times in a windowed Chrome
+tools/hands.html               the hand bench: the painted hands alone, enlarged (open under pnpm dev)
+tools/handshot.js              screenshot of the hand bench
 ```
 
 ## Card art

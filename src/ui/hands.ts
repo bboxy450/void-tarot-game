@@ -106,19 +106,23 @@ function lanternSprite(): HTMLCanvasElement {
   return px.canvas();
 }
 
-// --- painted hands: lit volumes, brush grain, dithered onto colour ramps, at twice the pixel density
+// --- painted hands, at twice the pixel density of the chunky sprites.
+// Each hand is a few groups of tapered capsules (palm, each finger, thumb, sleeve) raised into a height
+// field: capsules in one group melt together, groups meet in a crease. Normals and shadow come from that
+// height field; nails, joint creases and a soft dab grain are painted on; colour is dithered onto ramps.
 
 const RAMP = {
   skin: ['#1a0c16', '#341620', '#552628', '#78382e', '#985034', '#b46a40', '#ca8450', '#dca068', '#ecbe8a', '#f8dab4'],
+  nail: ['#2a1420', '#56303a', '#84525a', '#ae7c7c', '#d2a49c', '#ecc8bc', '#fbe6dc'],
   robe: ['#0a0618', '#140c2a', '#20143e', '#2e1e54', '#3e2a6c', '#523a86', '#6a50a2', '#8670bc'],
   gold: ['#2a1606', '#4e300c', '#7a5014', '#a8761e', '#d0a030', '#ecc650', '#fae48a', '#fff6cc'],
 };
 type Ramp = keyof typeof RAMP;
 const RAMP_RGB = Object.fromEntries(Object.entries(RAMP).map(([k, v]) => [k, v.map((c) => hex(c).map((x) => Math.round(x * 255)))])) as Record<Ramp, number[][]>;
 
-/** A tapered capsule from a to b: a finger joint, a palm, a sleeve. z lifts it toward the eye. */
-interface Part { a: [number, number]; b: [number, number]; r0: number; r1: number; z: number; ramp: Ramp; bias?: number; grain?: number; folds?: boolean }
-const cap = (a: [number, number], b: [number, number], r0: number, r1: number, z: number, ramp: Ramp = 'skin', more: Partial<Part> = {}): Part => ({ a, b, r0, r1, z, ramp, ...more });
+type V2 = [number, number];
+/** A tapered capsule from a to b. Parts with the same group melt together; z lifts toward the eye. */
+interface Part { a: V2; b: V2; r0: number; r1: number; z: number; group: number; ramp: Ramp; nail?: boolean; joint?: boolean; band?: [number, number]; bias?: number }
 
 const hash = (x: number, y: number) => {
   const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
@@ -130,132 +134,193 @@ const vnoise = (x: number, y: number) => {
   const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 };
+const unit = (v: number[]) => { const m = Math.hypot(...v); return v.map((x) => x / m); };
+const LIGHT = unit([-0.55, -0.7, 0.55]);
+const RIM = unit([0.9, 0.1, 0.2]);
+const HALF = unit([LIGHT[0], LIGHT[1], LIGHT[2] + 1]);
+const SMOOTH = 7;
 
-const LIGHT = (() => { const l = [-0.5, -0.62, 0.6]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
-const RIM = (() => { const l = [0.85, -0.1, 0.25]; const m = Math.hypot(...l); return l.map((v) => v / m); })();
-
-/** Rasterise the parts as rounded volumes, light them from the lantern side, add the brush grain, dither to ramps. */
-function paintHand(w: number, h: number, parts: Part[]): HTMLCanvasElement {
-  const N = w * h;
-  const zb = new Float32Array(N).fill(-1e9);
-  const id = new Int16Array(N).fill(-1);
-  const nx = new Float32Array(N), ny = new Float32Array(N), nz = new Float32Array(N);
-  const uu = new Float32Array(N), vv = new Float32Array(N);
-  parts.forEach((p, k) => {
-    const dx = p.b[0] - p.a[0], dy = p.b[1] - p.a[1];
-    const len2 = Math.max(1e-6, dx * dx + dy * dy), len = Math.sqrt(len2);
-    const R = Math.max(p.r0, p.r1);
-    const x0 = Math.max(0, Math.floor(Math.min(p.a[0], p.b[0]) - R)), x1 = Math.min(w - 1, Math.ceil(Math.max(p.a[0], p.b[0]) + R));
-    const y0 = Math.max(0, Math.floor(Math.min(p.a[1], p.b[1]) - R)), y1 = Math.min(h - 1, Math.ceil(Math.max(p.a[1], p.b[1]) + R));
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const px = x + 0.5 - p.a[0], py = y + 0.5 - p.a[1];
-      const t = Math.min(1, Math.max(0, (px * dx + py * dy) / len2));
-      const ox = px - t * dx, oy = py - t * dy;
-      const r = p.r0 + (p.r1 - p.r0) * t;
-      const d2 = ox * ox + oy * oy;
-      if (d2 >= r * r) continue;
-      const hz = Math.sqrt(r * r - d2);
-      const z = p.z + hz;
-      const i = y * w + x;
-      if (z <= zb[i]) continue;
-      zb[i] = z; id[i] = k;
-      nx[i] = ox / r; ny[i] = oy / r; nz[i] = hz / r;
-      uu[i] = t * len; vv[i] = (ox * -dy + oy * dx) / len;
-    }
-  });
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const g = c.getContext('2d')!;
-  const img = g.createImageData(w, h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = y * w + x;
-    const k = id[i];
-    if (k < 0) {
-      // a dark rim round the silhouette, so the hand reads against the painting
-      let edge = false;
-      for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const X = x + ex, Y = y + ey;
-        if (X >= 0 && Y >= 0 && X < w && Y < h && id[Y * w + X] >= 0) edge = true;
-      }
-      if (edge) { img.data[i * 4] = 20; img.data[i * 4 + 1] = 10; img.data[i * 4 + 2] = 22; img.data[i * 4 + 3] = 255; }
-      continue;
-    }
-    const p = parts[k];
-    const dif = Math.max(0, nx[i] * LIGHT[0] + ny[i] * LIGHT[1] + nz[i] * LIGHT[2]);
-    const rim = Math.pow(Math.max(0, nx[i] * RIM[0] + ny[i] * RIM[1] + nz[i] * RIM[2]), 3) * (1 - nz[i]);
-    // half-vector highlight on skin and metal
-    const hx = LIGHT[0], hy = LIGHT[1], hzv = LIGHT[2] + 1, hm = Math.hypot(hx, hy, hzv);
-    const spec = Math.pow(Math.max(0, (nx[i] * hx + ny[i] * hy + nz[i] * hzv) / hm), p.ramp === 'gold' ? 12 : 26) * (p.ramp === 'robe' ? 0.05 : p.ramp === 'gold' ? 0.4 : 0.22);
-    // crevices: a nearer part close by darkens this one (knuckle gaps, the thumb's shadow)
-    let ao = 0;
-    for (let ry = -3; ry <= 3; ry++) for (let rx = -3; rx <= 3; rx++) {
-      const X = x + rx, Y = y + ry;
-      if (X < 0 || Y < 0 || X >= w || Y >= h) continue;
-      const j = Y * w + X;
-      if (id[j] >= 0 && id[j] !== k && zb[j] > zb[i] + 1.5) ao += 1 / (1 + rx * rx + ry * ry);
-    }
-    ao = Math.min(1, ao * 0.55);
-    // brush grain: strokes laid along each part's length; folds for cloth
-    const gr = p.grain ?? 1;
-    let grain = (vnoise(uu[i] * 0.16 + k * 13.7, vv[i] * 0.55) - 0.5) * 0.28 * gr + (vnoise(uu[i] * 0.5 + k * 3.1, vv[i] * 1.4) - 0.5) * 0.1 * gr;
-    if (p.folds) grain += (Math.sin(vv[i] * 0.42 + vnoise(uu[i] * 0.05, k) * 5) * 0.5) * 0.16;
-    let v = 0.1 + 0.74 * dif + 0.22 * rim + spec + grain - 0.42 * ao + (p.bias ?? 0);
-    const ramp = RAMP_RGB[p.ramp];
-    const n = ramp.length;
-    const q = Math.min(n - 1, Math.max(0, Math.floor(v * (n - 1) + BAYER[(y & 3) * 4 + (x & 3)])));
-    const col = ramp[q];
-    img.data[i * 4] = col[0]; img.data[i * 4 + 1] = col[1]; img.data[i * 4 + 2] = col[2]; img.data[i * 4 + 3] = 255;
+/** A builder: groups of capsules, painted to a canvas. */
+class Body {
+  parts: Part[] = [];
+  private g = 0;
+  group() { return ++this.g; }
+  cap(group: number, a: V2, b: V2, r0: number, r1: number, z: number, more: Partial<Part> = {}) {
+    this.parts.push({ a, b, r0, r1, z, group, ramp: 'skin', ...more });
   }
-  g.putImageData(img, 0, 0);
-  return c;
+  /** A finger as a chain of joints from the knuckle: lengths, radius at the knuckle, direction and bend per joint. */
+  finger(at: V2, ang: number, lens: number[], r: number, z: number, bend: number, dz = 3, nail = true) {
+    const g = this.group();
+    let p = at, a = ang, rr = r;
+    lens.forEach((L, i) => {
+      const q: V2 = [p[0] + Math.cos(a) * L, p[1] + Math.sin(a) * L];
+      const r1 = rr * 0.88;
+      this.cap(g, p, q, rr, r1, z + i * dz, { nail: nail && i === lens.length - 1, joint: i > 0, bias: -0.02 * i });
+      p = q; a += bend; rr = r1;
+    });
+    return p;
+  }
+  /** Sleeve with a gold band at its mouth, and the wrist coming out of it. */
+  arm(from: V2, wrist: V2, sleeveR: number) {
+    const dx = wrist[0] - from[0], dy = wrist[1] - from[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const at = (k: number): V2 => [from[0] + ux * k, from[1] + uy * k];
+    const s = this.group();
+    this.cap(s, at(-40), at(L - 16), sleeveR + 14, sleeveR, 0, { ramp: 'robe', band: [L + 40 - 28, L + 40 - 20] });
+    return at(L - 30);
+  }
+
+  paint(w: number, h: number): HTMLCanvasElement {
+    const N = w * h, NEG = -1e9;
+    const groups = new Map<number, Part[]>();
+    for (const p of this.parts) (groups.get(p.group) ?? groups.set(p.group, []).get(p.group)!).push(p);
+    const H = new Float32Array(N).fill(NEG), G = new Int16Array(N).fill(-1), P = new Int16Array(N).fill(-1);
+    const U = new Float32Array(N), V = new Float32Array(N);
+    const gh = new Float32Array(N), gp = new Int16Array(N), gu = new Float32Array(N), gv = new Float32Array(N), gbest = new Float32Array(N);
+    for (const [gid, list] of groups) {
+      gh.fill(NEG); gp.fill(-1); gbest.fill(NEG);
+      for (const p of list) {
+        const k = this.parts.indexOf(p);
+        const dx = p.b[0] - p.a[0], dy = p.b[1] - p.a[1];
+        const len2 = Math.max(1e-6, dx * dx + dy * dy), len = Math.sqrt(len2);
+        const R = Math.max(p.r0, p.r1) + SMOOTH;
+        const x0 = Math.max(0, Math.floor(Math.min(p.a[0], p.b[0]) - R)), x1 = Math.min(w - 1, Math.ceil(Math.max(p.a[0], p.b[0]) + R));
+        const y0 = Math.max(0, Math.floor(Math.min(p.a[1], p.b[1]) - R)), y1 = Math.min(h - 1, Math.ceil(Math.max(p.a[1], p.b[1]) + R));
+        for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+          const px = x + 0.5 - p.a[0], py = y + 0.5 - p.a[1];
+          const t = Math.min(1, Math.max(0, (px * dx + py * dy) / len2));
+          const ox = px - t * dx, oy = py - t * dy;
+          const r = p.r0 + (p.r1 - p.r0) * t;
+          const d = Math.hypot(ox, oy);
+          const i = y * w + x;
+          // inside: a rounded profile; just outside: a short skirt, so neighbours in the group blend
+          const inside = d < r;
+          const hh = inside ? p.z + Math.sqrt(r * r - d * d) : p.z - (d - r) * 3;
+          if (!inside && gh[i] === NEG) continue;
+          const cur = gh[i];
+          if (cur === NEG) gh[i] = hh;
+          else { const m = Math.max(0, SMOOTH - Math.abs(cur - hh)) / SMOOTH; gh[i] = Math.max(cur, hh) + m * m * SMOOTH * 0.25; }
+          if (inside && hh > gbest[i]) { gbest[i] = hh; gp[i] = k; gu[i] = t * len; gv[i] = (ox * -dy + oy * dx) / len; }
+        }
+      }
+      for (let i = 0; i < N; i++) {
+        if (gp[i] < 0 || gh[i] <= H[i]) continue;
+        H[i] = gh[i]; G[i] = gid; P[i] = gp[i]; U[i] = gu[i]; V[i] = gv[i];
+      }
+    }
+    const at = (x: number, y: number, g: number, fallback: number) => {
+      if (x < 0 || y < 0 || x >= w || y >= h) return fallback;
+      const j = y * w + x;
+      return G[j] === g ? H[j] : fallback;
+    };
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d')!;
+    const img = ctx.createImageData(w, h);
+    const put = (i: number, col: number[]) => { img.data[i * 4] = col[0]; img.data[i * 4 + 1] = col[1]; img.data[i * 4 + 2] = col[2]; img.data[i * 4 + 3] = 255; };
+    const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const k = P[i];
+      if (k < 0) {
+        let edge = false;
+        for (const [ex, ey] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const X = x + ex, Y = y + ey;
+          if (X >= 0 && Y >= 0 && X < w && Y < h && P[Y * w + X] >= 0) edge = true;
+        }
+        if (edge) put(i, [20, 10, 22]);
+        continue;
+      }
+      const p = this.parts[k], g = G[i], h0 = H[i];
+      // normal from the group's height field (a crease where groups meet)
+      const ddx = (at(x + 1, y, g, h0) - at(x - 1, y, g, h0)) * 0.5, ddy = (at(x, y + 1, g, h0) - at(x, y - 1, g, h0)) * 0.5;
+      const [nx, ny, nz] = unit([-Math.max(-4, Math.min(4, ddx)), -Math.max(-4, Math.min(4, ddy)), 1]);
+      // shadow: how much of the sky each of eight directions sees over the height field
+      let occ = 0;
+      for (const [ex, ey] of DIRS) {
+        let m = 0;
+        for (let s = 1; s <= 7; s += 1.5) {
+          const X = Math.round(x + ex * s), Y = Math.round(y + ey * s);
+          if (X < 0 || Y < 0 || X >= w || Y >= h) break;
+          const j = Y * w + X;
+          if (P[j] >= 0) m = Math.max(m, (H[j] - h0) / s);
+        }
+        occ += Math.atan(m) / (Math.PI / 2);
+      }
+      occ /= DIRS.length;
+      let ramp: Ramp = p.ramp;
+      const dif = Math.max(0, nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]);
+      const rim = Math.pow(Math.max(0, nx * RIM[0] + ny * RIM[1] + nz * RIM[2]), 2) * (1 - nz);
+      const sp = Math.max(0, nx * HALF[0] + ny * HALF[1] + nz * HALF[2]);
+      let v = 0.24 + 0.7 * dif + 0.2 * rim - 0.5 * occ + (p.bias ?? 0);
+      const u = U[i], vv = V[i];
+      const len = Math.hypot(p.b[0] - p.a[0], p.b[1] - p.a[1]);
+      const r = p.r0 + (p.r1 - p.r0) * Math.min(1, u / Math.max(1, len));
+      if (ramp === 'robe') {
+        // cloth: folds along the sleeve, a gold band at its mouth
+        v += Math.sin(vv * 0.38 + vnoise(u * 0.04, 3) * 6) * 0.09 + (vnoise(x * 0.25, y * 0.25) - 0.5) * 0.14;
+        if (p.band && u > p.band[0] && u < p.band[1]) { ramp = 'gold'; v += 0.05 + Math.pow(sp, 10) * 0.45 - (u - p.band[0] < 2 || p.band[1] - u < 2 ? 0.25 : 0); }
+      } else {
+        v += Math.pow(sp, 24) * 0.25;
+        v += (vnoise(x * 0.32, y * 0.32) - 0.5) * 0.1 + (vnoise(x * 0.9 + 7, y * 0.9) - 0.5) * 0.06;
+        // the nail: a pale shield near the tip, with a dark rim
+        if (p.nail) {
+          const nu = (u - (len - r * 0.35)) / (r * 0.75), nw = vv / (r * 0.5);
+          const e = nu * nu + nw * nw;
+          if (e < 1) { ramp = 'nail'; v += 0.12 + Math.pow(sp, 14) * 0.4; if (e > 0.62) v -= 0.3; }
+        }
+        // creases across the back of each joint
+        if (p.joint && u < 3.2 && Math.abs(vv) < r * 0.55 && (Math.round(u) === 1 || Math.round(u) === 3)) v -= 0.16;
+      }
+      const ramps = RAMP_RGB[ramp], n = ramps.length;
+      put(i, ramps[Math.min(n - 1, Math.max(0, Math.floor(v * (n - 1) + BAYER[(y & 3) * 4 + (x & 3)])))]);
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
 }
 
-/** Sleeve, gold cuff and wrist rising from a corner toward the hand. */
-function arm(from: [number, number], wrist: [number, number], side: 1 | -1): Part[] {
-  const dx = wrist[0] - from[0], dy = wrist[1] - from[1], L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
-  const at = (k: number): [number, number] => [from[0] + ux * k, from[1] + uy * k];
-  void side;
-  return [
-    cap(at(-40), at(L - 20), 52, 36, 0, 'robe', { folds: true, grain: 1.4, bias: 0.06 }),
-    cap(at(L - 24), at(L - 17), 26, 25, 14, 'gold', { grain: 0.8, bias: -0.18 }),
-    cap(at(L - 18), wrist, 21, 20, 18, 'skin'),
-  ];
+/** Left hand: a fist round the staff (x 74..86), thumb over the fingers, sleeve from the lower left. */
+export function fistSprite(): HTMLCanvasElement {
+  const b = new Body();
+  const wrist = b.arm([-14, 300], [62, 210], 34);
+  const palm = b.group();
+  b.cap(palm, wrist, [62, 210], 20, 21, 8);
+  b.cap(palm, [58, 214], [64, 194], 24, 21, 10);
+  // four fingers wrapped round the staff: the middle joints face us, tips tucked into the palm
+  [[176, 8.6], [192, 8.8], [207, 8.4], [221, 7.4]].forEach(([y, r], i) => b.finger([68, y], 0.05, [24, 9], r, 20 - i, 1.9, 2, false));
+  b.finger([50, 196], -0.42, [22, 15], 9.4, 30, 0.38, 3);
+  return b.paint(148, 280);
 }
 
-/** Left hand: a fist round the staff, thumb over the fingers, sleeve from the lower left. */
-function fistSprite(): HTMLCanvasElement {
-  const parts: Part[] = [...arm([-6, 300], [64, 204], -1), cap([62, 208], [76, 186], 23, 21, 14)];
-  const ys = [174, 189, 204, 218], rs = [8.5, 8.5, 8, 7];
-  ys.forEach((y, i) => {
-    parts.push(cap([76, y], [100, y + 2], rs[i], rs[i] - 0.5, 22 - i));
-    parts.push(cap([100, y + 2], [97, y + 9], rs[i] - 0.5, rs[i] - 1.5, 20 - i, 'skin', { bias: -0.08 }));
-  });
-  parts.push(cap([56, 190], [84, 174], 10, 8.5, 34), cap([84, 174], [98, 177], 8.5, 6.5, 36, 'skin', { bias: 0.04 }));
-  return paintHand(148, 280, parts);
-}
-
-/** Right hand: fingers behind the card (back), palm and thumb in front of it (front), or open. */
-function cardHandSprites(): { back: HTMLCanvasElement; front: HTMLCanvasElement; open: HTMLCanvasElement } {
-  const sleeve = () => arm([206, 300], [124, 196], 1);
-  const back: Part[] = [];
-  [70, 87, 104, 121].forEach((y, i) => {
-    const r = [8, 8.5, 8, 7][i];
-    back.push(cap([108, y], [130, y + 3], r, r - 0.5, 4 - i), cap([130, y + 3], [127, y + 10], r - 0.5, r - 1.5, 2 - i, 'skin', { bias: -0.06 }));
-  });
-  const front: Part[] = [...sleeve(), cap([126, 198], [114, 172], 25, 22, 14),
-    cap([110, 184], [86, 156], 11.5, 9.5, 40), cap([86, 156], [71, 140], 9.5, 7.5, 44, 'skin', { bias: 0.04 })];
-  const open: Part[] = [...sleeve(), cap([124, 200], [110, 172], 27, 24, 14)];
-  const lens = [34, 39, 36, 28];
-  lens.forEach((L, i) => {
-    const a = -Math.PI / 2 + (i - 1.2) * 0.14;
-    const bx = 94 + i * 12, by = 162 + Math.abs(i - 1.5) * 3;
-    const mx = bx + Math.cos(a) * L * 0.55, my = by + Math.sin(a) * L * 0.55;
-    const tx = bx + Math.cos(a - 0.12) * L, ty = by + Math.sin(a - 0.12) * L;
-    const r = i === 3 ? 6.5 : 7.5;
-    open.push(cap([bx, by], [mx, my], r, r - 0.5, 20), cap([mx, my], [tx, ty], r - 0.5, r - 1.5, 21));
-  });
-  open.push(cap([102, 194], [80, 172], 11, 9.5, 24), cap([80, 172], [70, 156], 9.5, 7.5, 26, 'skin', { bias: 0.04 }));
-  return { back: paintHand(180, 280, back), front: paintHand(180, 280, front), open: paintHand(180, 280, open) };
+/** Right hand: fingers behind the card (back), hand and thumb in front of it (front), or empty and relaxed (open). */
+export function cardHandSprites(): { back: HTMLCanvasElement; front: HTMLCanvasElement; open: HTMLCanvasElement } {
+  // card covers x 40..120, y 40..160
+  const back = new Body();
+  // the back of the hand runs down the card's right edge, from the knuckles to the wrist
+  const bh = back.group();
+  back.cap(bh, [140, 104], [144, 196], 15, 19, -6);
+  [[92, 7.4], [107, 7.8], [122, 7.5], [136, 6.8]].forEach(([y, r], i) => back.finger([138, y + 4], Math.PI + 0.1, [18, 12], r, 6 - i, 0.45, 1, false));
+  const front = new Body();
+  const w1 = front.arm([204, 300], [140, 214], 36);
+  const pg = front.group();
+  front.cap(pg, w1, [138, 210], 21, 21, 8);
+  front.cap(pg, [142, 212], [140, 192], 19, 18, 10);
+  // the thumb's root muscle swelling into the thumb, laid across the card's lower corner
+  const th = front.group();
+  front.cap(th, [140, 200], [128, 184], 15, 12, 18);
+  front.cap(th, [128, 184], [106, 160], 11, 9.4, 22, { joint: false });
+  front.cap(th, [106, 160], [92, 146], 9.4, 8.2, 25, { nail: true, joint: true });
+  const open = new Body();
+  const w2 = open.arm([206, 300], [130, 220], 36);
+  const og = open.group();
+  open.cap(og, w2, [128, 214], 21, 21, 8);
+  open.cap(og, [124, 210], [117, 174], 29, 28, 12);
+  open.cap(og, [98, 166], [136, 170], 11, 10, 20);
+  // fingers loosely together, joints curling toward the eye
+  ([[98, 164, -1.74, [26, 18, 13], 8.4], [111, 160, -1.62, [29, 20, 14], 8.7], [124, 162, -1.5, [27, 18, 13], 8.3], [136, 167, -1.38, [21, 14, 10], 7.4]] as [number, number, number, number[], number][])
+    .forEach(([x, y, a, lens, r]) => open.finger([x, y], a, lens, r, 22, -0.16, 4));
+  open.finger([102, 196], -2.2, [20, 15], 9.4, 30, 0.3, 3);
+  return { back: back.paint(180, 280), front: front.paint(180, 280), open: open.paint(180, 280) };
 }
 
 function heartSprite(full: boolean): HTMLCanvasElement {
