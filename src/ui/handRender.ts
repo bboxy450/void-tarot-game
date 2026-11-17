@@ -13,6 +13,13 @@ export interface Cap { a: V3; b: V3; ra: number; rb: number; group: number; k: n
 
 export interface Frame { origin: V3; fingers: V3; back: V3; mirror?: boolean }
 /** local hand space: a right hand, wrist at 0, fingers along +y, back of the hand toward +z, thumb toward -x */
+export function basis(f: Frame) {
+  const Y = norm(f.fingers);
+  let Z = norm(f.back);
+  const X = norm(cross(Y, Z));
+  Z = cross(X, Y);
+  return { X, Y, Z, s: f.mirror ? -1 : 1 };
+}
 function framer(f: Frame) {
   const Y = norm(f.fingers);
   let Z = norm(f.back);
@@ -89,6 +96,29 @@ uniform vec2 uRes; uniform int uN; uniform float uTan;
 uniform vec4 uA[${MAX}]; uniform vec4 uB[${MAX}]; uniform vec4 uM[${MAX}]; uniform vec3 uU[${MAX}];
 uniform vec3 uKey; uniform vec3 uKeyCol; uniform vec3 uFillCol; uniform vec3 uRim; uniform vec3 uRimCol;
 uniform float uCardZ; uniform vec4 uCard; // card centre xy, half size xy (it lies in z = uCardZ)
+uniform float uInk; uniform vec3 uHO, uHX, uHY, uHZ; uniform float uHS; // the tattooed hand's frame
+float seg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
+// a spider on the back of the hand, in hand space (cm): head toward the index knuckle, legs over the knuckle and the thumb
+float spider(vec2 q){
+  q = (q - vec2(-1.2, 5.0)) / 0.7 + vec2(-0.6, 4.6); // smaller, toward the thumb
+  vec2 T = vec2(-1.0, 5.6), A = vec2(-0.25, 3.5);
+  vec2 d = normalize(T - A), s = vec2(d.y, -d.x);
+  vec2 qa = q - A; vec2 la = vec2(dot(qa, s), dot(qa, d));
+  float ink = 1.0 - smoothstep(0.95, 1.05, length(la / vec2(1.2, 1.45)));
+  // the pale swirl on its back
+  float ang = atan(la.y, la.x), rr = length(la / vec2(1.2, 1.45));
+  float sw = abs(fract((rr * 3.2 - ang / 6.2832) ) - 0.5);
+  if (rr < 0.7 && sw < 0.12) ink *= 0.15;
+  vec2 qt = q - T; ink = max(ink, 1.0 - smoothstep(0.9, 1.0, length(vec2(dot(qt, s), dot(qt, d)) / vec2(0.7, 0.85))));
+  vec2 K[16] = vec2[16](vec2(-2.0, 7.4), vec2(-2.6, 9.7), vec2(-2.5, 6.5), vec2(-3.7, 6.1), vec2(-2.5, 5.0), vec2(-3.1, 3.5), vec2(-1.9, 4.0), vec2(-2.3, 1.8),
+                        vec2(0.3, 7.0), vec2(0.8, 8.1), vec2(0.8, 5.8), vec2(1.7, 6.5), vec2(1.0, 4.4), vec2(2.4, 3.1), vec2(1.0, 2.1), vec2(1.7, 0.5));
+  for (int i = 0; i < 8; i++) {
+    vec2 o = i == 7 ? A : T, k = K[i * 2], e = K[i * 2 + 1];
+    float w = 0.3 + 0.04 * sin(float(i) * 3.1);
+    ink = max(ink, 1.0 - smoothstep(w - 0.1, w, min(seg(q, o, k), seg(q, k, e) + 0.04 * length(q - k))));
+  }
+  return ink;
+}
 out vec4 o;
 float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -130,36 +160,41 @@ void main(){
   vec3 alb; float spec = 0.12, rough = 24.0, sss = 0.0;
   if (mat == 0) {
     float g = fbm(p * 2.2);
-    alb = mix(vec3(0.46, 0.27, 0.17), vec3(0.58, 0.37, 0.24), g);
-    alb = mix(alb, vec3(0.55, 0.25, 0.18), 0.4 * smoothstep(0.5, 0.8, fbm(p * 0.9 + 3.0)));
-    n = normalize(n + 0.3 * (vec3(noise(p * 7.0), noise(p * 7.0 + 7.0), noise(p * 7.0 + 13.0)) - 0.5) + 0.2 * (vec3(noise(p * 19.0), noise(p * 19.0 + 3.0), noise(p * 19.0 + 5.0)) - 0.5));
-    alb *= 0.82 + 0.36 * fbm(p * 5.0 + 11.0);
+    alb = mix(vec3(0.6, 0.4, 0.31), vec3(0.72, 0.5, 0.4), g);
+    alb = mix(alb, vec3(0.7, 0.38, 0.32), 0.45 * smoothstep(0.5, 0.8, fbm(p * 0.9 + 3.0)));
+    n = normalize(n + 0.16 * (vec3(noise(p * 7.0), noise(p * 7.0 + 7.0), noise(p * 7.0 + 13.0)) - 0.5) + 0.07 * (vec3(noise(p * 19.0), noise(p * 19.0 + 3.0), noise(p * 19.0 + 5.0)) - 0.5));
+    alb *= 0.86 + 0.28 * fbm(p * 2.2 + 11.0);
     sss = 1.0;
     vec3 up = uU[bi];
     if (uM[bi].z > 0.5 && bt > 0.42 && dot(n, up) > 0.55) { alb = vec3(0.6, 0.44, 0.36); spec = 0.3; rough = 60.0; if (bt < 0.5 || dot(n, up) < 0.62) alb *= 0.75; }
     if (uM[bi].w > 0.5 && bt < 0.16 && dot(n, up) > 0.2) alb *= 0.82 + 0.18 * smoothstep(-0.3, 0.6, sin(bt * 140.0));
+    if (uInk > 0.5) {
+      vec3 hp = p - uHO; vec3 lq = vec3(dot(hp, uHX) * uHS, dot(hp, uHY), dot(hp, uHZ));
+      float facing = dot(n, uHZ);
+      if (lq.z > -0.2 && facing > 0.1) { float k = spider(lq.xy) * smoothstep(0.1, 0.4, facing) * (0.85 + 0.15 * noise(p * 14.0)); alb = mix(alb, vec3(0.03, 0.045, 0.08), k * 0.9); }
+    }
   } else if (mat == 6) { alb = mix(vec3(0.09, 0.06, 0.2), vec3(0.2, 0.13, 0.36), fbm(p * vec3(1.5, 0.3, 1.5))); spec = 0.04; rough = 8.0; n = normalize(n + 0.25 * (vec3(noise(p * 6.0), noise(p * 6.0 + 5.0), noise(p * 6.0 + 9.0)) - 0.5)); }
   else if (mat == 7) { alb = vec3(0.5, 0.34, 0.12); spec = 0.45; rough = 24.0; n = normalize(n + 0.2 * (vec3(noise(p * 8.0), noise(p * 8.0 + 3.0), 0.0) - 0.5)); }
-  else { alb = mix(vec3(0.20, 0.12, 0.07), vec3(0.42, 0.27, 0.15), fbm(p * vec3(6.0, 0.4, 6.0))); spec = 0.15; rough = 16.0; }
+  else { alb = mix(vec3(0.30, 0.19, 0.11), vec3(0.55, 0.36, 0.2), fbm(p * vec3(6.0, 0.4, 6.0))); spec = 0.25; rough = 14.0; }
   vec3 v = -rd, L = normalize(uKey);
   float ndl = dot(n, L);
-  float dif = sss > 0.5 ? max(0.0, (ndl + 0.35) / 1.35) : max(0.0, ndl);
+  float dif = sss > 0.5 ? max(0.0, (ndl + 0.15) / 1.15) : max(0.0, ndl);
   float sh = shadow(p + n * 0.04, L);
   float ao = occl(p, n);
   vec3 col = alb * uKeyCol * dif * sh;
-  if (sss > 0.5) col += alb * vec3(0.55, 0.12, 0.06) * smoothstep(0.35, 0.0, abs(ndl)) * 0.6 * sh; // the warm edge of the shadow
+  if (sss > 0.5) col += alb * vec3(0.55, 0.12, 0.06) * (1.0 - smoothstep(0.0, 0.35, abs(ndl))) * 0.6 * sh; // the warm edge of the shadow
   col += alb * uFillCol * (0.55 + 0.45 * n.y) * ao;
   col += uRimCol * pow(max(0.0, dot(n, normalize(uRim))), 2.0) * pow(1.0 - max(0.0, dot(n, v)), 2.0) * ao * (mat == 0 ? 0.9 : 0.5);
   col += uKeyCol * spec * pow(max(0.0, dot(n, normalize(L + v))), rough) * sh;
-  col *= mix(0.55, 1.0, ao);
-  col = col / (1.0 + 0.35 * col); col = pow(col, vec3(1.0 / 2.2)); col = mix(vec3(dot(col, vec3(0.3, 0.55, 0.15))), col, 1.1); col = (col - 0.5) * 1.22 + 0.44;
+  col *= mix(0.55, 1.0, ao) * 1.45;
+  col = col / (1.0 + 0.35 * col); col = pow(col, vec3(1.0 / 2.2)); col = mix(vec3(dot(col, vec3(0.3, 0.55, 0.15))), col, 0.85); col = (col - 0.5) * 1.35 + 0.36;
   o = vec4(col, p.z > uCardZ ? 1.0 : 0.5);
 }`;
 const VERT = `#version 300 es
 void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
 
 export interface Light { key: V3; keyCol: V3; fillCol: V3; rim: V3; rimCol: V3 }
-export interface Shot { w: number; h: number; fovY: number; caps: Cap[]; light: Light; card?: { z: number; cx: number; cy: number; hw: number; hh: number } }
+export interface Shot { w: number; h: number; fovY: number; caps: Cap[]; light: Light; card?: { z: number; cx: number; cy: number; hw: number; hh: number }; ink?: Frame }
 
 let gl: WebGL2RenderingContext | null = null;
 let prog: WebGLProgram | null = null;
@@ -176,12 +211,33 @@ function setup(): WebGL2RenderingContext {
   return gl;
 }
 
-const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16 - 0.5);
+const COLOURS = 40;
+/** Median cut: split the colour box with the widest channel at its median until there are n boxes; each box's mean is a colour. */
+function palette(cols: number[][], n: number): number[][] {
+  let boxes = [cols];
+  while (boxes.length < n) {
+    let bi = -1, bc = 0, br = -1;
+    boxes.forEach((b, i) => {
+      if (b.length < 2) return;
+      for (let c = 0; c < 3; c++) {
+        let lo = 255, hi = 0;
+        for (const p of b) { lo = Math.min(lo, p[c]); hi = Math.max(hi, p[c]); }
+        const score = (hi - lo) * Math.sqrt(b.length);
+        if (score > br) { br = score; bi = i; bc = c; }
+      }
+    });
+    if (bi < 0) break;
+    const b = boxes[bi].slice().sort((p, q) => p[bc] - q[bc]);
+    const m = b.length >> 1;
+    boxes.splice(bi, 1, b.slice(0, m), b.slice(m));
+  }
+  return boxes.map((b) => [0, 1, 2].map((c) => b.reduce((a, p) => a + p[c], 0) / b.length));
+}
 
-/** Render at twice the size, average down, dither to a coarse colour grid. Returns all, front-of-card and behind-card sprites. */
+/** Render at four times the size, average each block down, cut to a 40-colour palette without dither. Returns all, front-of-card and behind-card sprites. */
 export function renderHand(s: Shot): { all: HTMLCanvasElement; front: HTMLCanvasElement; back: HTMLCanvasElement } {
   const g = setup();
-  const SS = 2, W = s.w * SS, H = s.h * SS;
+  const SS = 4, W = s.w * SS, H = s.h * SS;
   g.canvas.width = W; g.canvas.height = H;
   g.viewport(0, 0, W, H);
   g.useProgram(prog);
@@ -199,6 +255,11 @@ export function renderHand(s: Shot): { all: HTMLCanvasElement; front: HTMLCanvas
   const cd = s.card;
   g.uniform1f(u('uCardZ'), cd ? cd.z : -1e9);
   g.uniform4f(u('uCard'), cd ? cd.cx : 0, cd ? cd.cy : 0, cd ? cd.hw : 0, cd ? cd.hh : 0);
+  g.uniform1f(u('uInk'), s.ink ? 1 : 0);
+  if (s.ink) {
+    const b = basis(s.ink);
+    g.uniform3fv(u('uHO'), s.ink.origin); g.uniform3fv(u('uHX'), b.X); g.uniform3fv(u('uHY'), b.Y); g.uniform3fv(u('uHZ'), b.Z); g.uniform1f(u('uHS'), b.s);
+  }
   g.drawArrays(g.TRIANGLES, 0, 3);
   const px = new Uint8Array(W * H * 4);
   g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, px);
@@ -219,15 +280,16 @@ export function renderHand(s: Shot): { all: HTMLCanvasElement; front: HTMLCanvas
     covered[o] = 1; front[o] = f * 2 >= n ? 1 : 0;
     rgb.set([r / n, gg / n, b / n], o * 3);
   }
-  const STEP = 255 / 13;
+  // cut the palette where the eye tells shades apart: in square-root space, so the shadows keep their steps
+  const seen: number[][] = [];
+  for (let o = 0; o < s.w * s.h; o++) if (covered[o]) seen.push([0, 1, 2].map((c) => Math.sqrt(rgb[o * 3 + c] / 255) * 255));
+  const pal = palette(seen, COLOURS).map((p) => p.map((v) => ((v / 255) ** 2) * 255));
   for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
     const o = y * s.w + x;
     if (!covered[o]) continue;
-    // a darker pixel where the form meets the air, so it reads against the painting
-    let edge = false;
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= s.w || Y >= s.h || !covered[Y * s.w + X]) edge = true; }
-    const d = BAYER4[(y & 3) * 4 + (x & 3)];
-    const col = [0, 1, 2].map((c) => Math.max(0, Math.min(255, Math.round((rgb[o * 3 + c] * (edge ? 0.45 : 1)) / STEP + d) * STEP)));
+    let best = pal[0], bd = 1e9;
+    for (const p of pal) { const d = (p[0] - rgb[o * 3]) ** 2 + (p[1] - rgb[o * 3 + 1]) ** 2 + (p[2] - rgb[o * 3 + 2]) ** 2; if (d < bd) { bd = d; best = p; } }
+    const col = best.map(Math.round);
     for (const [idx, ok] of [[0, true], [1, front[o] === 1], [2, front[o] === 0]] as [number, boolean][]) {
       if (!ok) continue;
       imgs[idx].data.set([col[0], col[1], col[2], 255], o * 4);

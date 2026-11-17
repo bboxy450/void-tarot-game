@@ -106,16 +106,18 @@ function lanternSprite(): HTMLCanvasElement {
 // --- the hands: posed 3D skeletons rendered once to sprites (see handRender.ts), at twice the pixel density
 
 const FOV = (35 * Math.PI) / 180;
+/** the spider on the back of the right hand */
+const TATTOO = true;
 /** the fist sprite reaches further left than the lantern sprite, for the forearm */
 export const FIST_PAD = 70, FIST_W = 148 + FIST_PAD;
-const LANTERN_LIGHT: Light = { key: [-0.2, 1, 0.5], keyCol: [1.15, 0.78, 0.48], fillCol: [0.15, 0.12, 0.26], rim: [1, 0.15, -0.4], rimCol: [0.35, 0.38, 0.75] };
-const SIDE_LIGHT: Light = { key: [-0.8, 0.7, 0.6], keyCol: [1.1, 0.76, 0.48], fillCol: [0.15, 0.12, 0.26], rim: [1, 0.3, -0.3], rimCol: [0.35, 0.38, 0.75] };
+const LANTERN_LIGHT: Light = { key: [-0.3, 1, 0.3], keyCol: [1.3, 0.98, 0.76], fillCol: [0.26, 0.22, 0.26], rim: [1, 0.15, -0.4], rimCol: [0.25, 0.27, 0.45] };
+const SIDE_LIGHT: Light = { key: [-0.6, 0.6, 0.55], keyCol: [1.25, 0.95, 0.74], fillCol: [0.26, 0.22, 0.26], rim: [1, 0.3, -0.3], rimCol: [0.25, 0.27, 0.45] };
 /** sprite pixel to world point at depth z */
 const at = (sx: number, sy: number, z: number, w: number, h: number): V3 => { const k = pxAt(z, h, FOV); return [(sx - w / 2) * k, (h / 2 - sy) * k, z]; };
 
 /** Left hand: a fist round the staff (sprite x 80), the thumb over the fingers, sleeve from the lower left. */
 export function fistSprite(): HTMLCanvasElement {
-  const w = FIST_W, h = 280, z = -40, sx = 80 + FIST_PAD;
+  const w = FIST_W, h = 280, z = -33, sx = 80 + FIST_PAD;
   const top = at(sx, 108, z, w, h), bottom = at(sx, 300, z, w, h), grip = at(sx, 200, z, w, h);
   const pose: Pose = {
     curl: [[1.3, 1.65, 0.9], [1.3, 1.7, 0.9], [1.3, 1.7, 0.9], [1.25, 1.7, 0.9]], spread: [0.04, 0, -0.02, -0.06],
@@ -139,12 +141,14 @@ export function cardHandSprites(): { back: HTMLCanvasElement; front: HTMLCanvasE
     curl: [[0.5, 0.7, 0.35], [0.55, 0.75, 0.35], [0.6, 0.8, 0.35], [0.7, 0.85, 0.35]], spread: [-0.04, 0, 0.04, 0.1],
     thumb: [[-0.65, 0.7, -0.2], [-0.45, 0.88, 0.1], [-0.3, 0.95, 0.12]], thumbBack: [-0.9, 0.1, 0.4],
   };
-  const held = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, card, caps: hand(grip, { origin: at(150, 200, -37.2, w, h), fingers: [-0.35, 0.55, -0.8], back: [0.9, 0.15, 0.35] }) });
+  const gripFrame: Frame = { origin: at(150, 200, -37.2, w, h), fingers: [-0.35, 0.55, -0.8], back: [0.8, 0.1, 0.6] };
+  const held = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, card, caps: hand(grip, gripFrame), ink: TATTOO ? gripFrame : undefined });
   const relaxed: Pose = {
     curl: [[0.3, 0.45, 0.25], [0.35, 0.5, 0.3], [0.42, 0.55, 0.3], [0.5, 0.6, 0.3]], spread: [-0.14, -0.04, 0.06, 0.18],
     thumb: [[-0.75, 0.6, -0.3], [-0.55, 0.8, -0.1], [-0.4, 0.9, 0.0]], thumbBack: [-0.6, 0.1, 0.8],
   };
-  const open = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, caps: hand(relaxed, { origin: at(138, 222, -36, w, h), fingers: [-0.4, 0.85, -0.3], back: [0.3, 0.2, 0.93] }) });
+  const openFrame: Frame = { origin: at(146, 236, -30, w, h), fingers: [-0.4, 0.85, -0.3], back: [0.3, 0.2, 0.93] };
+  const open = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, caps: hand(relaxed, openFrame), ink: TATTOO ? openFrame : undefined });
   return { back: held.back, front: held.front, open: open.all };
 }
 
