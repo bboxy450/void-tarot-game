@@ -9,7 +9,7 @@ const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[
 export const norm = (a: V3): V3 => mul(a, 1 / Math.hypot(...a));
 
 /** groups: 0 palm, 1..5 fingers and thumb (skin), 6 sleeve, 7 gold, 8 wood, 9 card (hidden, but it occludes) */
-export interface Cap { a: V3; b: V3; ra: number; rb: number; group: number; k: number; nail?: boolean; joint?: boolean; up?: V3 }
+export interface Cap { a: V3; b: V3; ra: number; rb: number; group: number; k: number; nail?: boolean; flat?: boolean; joint?: boolean; up?: V3 }
 
 export interface Frame { origin: V3; fingers: V3; back: V3; mirror?: boolean }
 /** local hand space: a right hand, wrist at 0, fingers along +y, back of the hand toward +z, thumb toward -x */
@@ -83,9 +83,9 @@ export function hand(pose: Pose, f: Frame): Cap[] {
     p = q;
   });
   // sleeve with a gold band at its mouth
-  const s = pose.sleeve ?? -3.2;
-  C([0, s + 0.15, -0.1], [0, s - 0.25, -0.1], 3.2, 3.22, 7, 0.3);
-  C([0, s - 0.1, -0.1], [0, s - 30, -0.4], 3.1, 5.4, 6, 1.0);
+  const s = pose.sleeve ?? -1.6;
+  C([0, s, -0.1], [0, s - 0.7, -0.1], 3.05, 3.1, 7, 0, { flat: true });
+  C([0, s - 0.6, -0.1], [0, s - 30, -0.4], 3.0, 5.2, 6, 0, { flat: true });
   return caps;
 }
 
@@ -96,7 +96,7 @@ uniform vec2 uRes; uniform int uN; uniform float uTan;
 uniform vec4 uA[${MAX}]; uniform vec4 uB[${MAX}]; uniform vec4 uM[${MAX}]; uniform vec3 uU[${MAX}];
 uniform vec3 uKey; uniform vec3 uKeyCol; uniform vec3 uFillCol; uniform vec3 uRim; uniform vec3 uRimCol;
 uniform float uCardZ; uniform vec4 uCard; // card centre xy, half size xy (it lies in z = uCardZ)
-uniform float uInk; uniform vec3 uHO, uHX, uHY, uHZ; uniform float uHS; // the tattooed hand's frame
+uniform float uInk; uniform vec3 uHO, uHX, uHY, uHZ; uniform float uHS; // the hand's frame (uInk: -1 none, 0 plain, 1 tattooed)
 float seg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
 // a spider on the back of the hand, in hand space (cm): head toward the index knuckle, legs over the knuckle and the thumb
 float spider(vec2 q){
@@ -127,7 +127,11 @@ float noise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f
 float fbm(vec3 p){ return 0.5 * noise(p) + 0.25 * noise(p * 2.03) + 0.125 * noise(p * 4.01); }
 float smin(float a, float b, float k){ if (k <= 0.0) return min(a, b); float h = max(k - abs(a - b), 0.0) / k; return min(a, b) - h * h * k * 0.25; }
 float capd(int i, vec3 p, out float t){ vec3 a = uA[i].xyz, ba = uB[i].xyz - a, pa = p - a;
-  t = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0); return length(pa - ba * t) - mix(uA[i].w, uB[i].w, t); }
+  float t0 = dot(pa, ba) / max(dot(ba, ba), 1e-6); t = clamp(t0, 0.0, 1.0);
+  float d = length(pa - ba * t) - mix(uA[i].w, uB[i].w, t);
+  if (uM[i].z > 1.5) { // a flat-ended tube (cloth, bands): cut at both ends
+    vec2 q = vec2(d, (abs(t0 - 0.5) - 0.5) * length(ba)); d = min(max(q.x, q.y), 0.0) + length(max(q, 0.0)); }
+  return d; }
 float G[10];
 float scene(vec3 p){
   for (int g = 0; g < 10; g++) G[g] = 1e9;
@@ -165,8 +169,25 @@ void main(){
     n = normalize(n + 0.16 * (vec3(noise(p * 7.0), noise(p * 7.0 + 7.0), noise(p * 7.0 + 13.0)) - 0.5) + 0.07 * (vec3(noise(p * 19.0), noise(p * 19.0 + 3.0), noise(p * 19.0 + 5.0)) - 0.5));
     alb *= 0.86 + 0.28 * fbm(p * 2.2 + 11.0);
     sss = 1.0;
+    if (uInk > -0.5) {
+      vec3 hp = p - uHO; vec2 h2 = vec2(dot(hp, uHX) * uHS, dot(hp, uHY)); float back = smoothstep(0.0, 0.5, dot(n, uHZ));
+      // four tendons fanning from the wrist to the knuckles, and the knuckles' folds of loose skin
+      for (int f = 0; f < 4; f++) {
+        vec2 kn = vec2(-2.6 + 1.75 * float(f), 8.8 - (f == 3 ? 0.4 : 0.0)), wr = vec2(-0.5 + 0.35 * float(f), 1.5);
+        float dd = seg(h2, wr, kn);
+        float ridge = (1.0 - smoothstep(0.0, 0.42, dd)) * smoothstep(1.5, 4.5, h2.y);
+        alb *= 1.0 + 0.10 * ridge * back;
+        n = normalize(n + 0.18 * ridge * back * normalize(uHZ));
+        vec2 dk = h2 - kn; float fold = (1.0 - smoothstep(0.6, 1.5, length(dk * vec2(1.0, 1.4)))) * back;
+        alb *= 1.0 - 0.16 * fold * smoothstep(0.35, 0.65, abs(sin(dk.y * 9.0 + dk.x * 1.5)));
+        alb = mix(alb, vec3(0.74, 0.46, 0.4), 0.35 * fold);
+      }
+      // a blue vein or two under the skin
+      float vn = abs(noise(vec3(h2 * vec2(0.55, 0.22), 2.0)) - 0.5);
+      alb = mix(alb, alb * vec3(0.78, 0.84, 1.02), back * (1.0 - smoothstep(0.02, 0.06, vn)) * smoothstep(1.0, 3.0, h2.y) * (1.0 - smoothstep(6.0, 8.0, h2.y)));
+    }
     vec3 up = uU[bi];
-    if (uM[bi].z > 0.5 && bt > 0.42 && dot(n, up) > 0.55) { alb = vec3(0.6, 0.44, 0.36); spec = 0.3; rough = 60.0; if (bt < 0.5 || dot(n, up) < 0.62) alb *= 0.75; }
+    if (uM[bi].z > 0.5 && uM[bi].z < 1.5 && bt > 0.42 && dot(n, up) > 0.55) { alb = vec3(0.6, 0.44, 0.36); spec = 0.3; rough = 60.0; if (bt < 0.5 || dot(n, up) < 0.62) alb *= 0.75; }
     if (uM[bi].w > 0.5 && bt < 0.16 && dot(n, up) > 0.2) alb *= 0.82 + 0.18 * smoothstep(-0.3, 0.6, sin(bt * 140.0));
     if (uInk > 0.5) {
       vec3 hp = p - uHO; vec3 lq = vec3(dot(hp, uHX) * uHS, dot(hp, uHY), dot(hp, uHZ));
@@ -181,20 +202,25 @@ void main(){
   float dif = sss > 0.5 ? max(0.0, (ndl + 0.15) / 1.15) : max(0.0, ndl);
   float sh = shadow(p + n * 0.04, L);
   float ao = occl(p, n);
+  float occ = mix(0.25, 1.0, ao * ao);
   vec3 col = alb * uKeyCol * dif * sh;
   if (sss > 0.5) col += alb * vec3(0.55, 0.12, 0.06) * (1.0 - smoothstep(0.0, 0.35, abs(ndl))) * 0.6 * sh; // the warm edge of the shadow
-  col += alb * uFillCol * (0.55 + 0.45 * n.y) * ao;
+  vec3 fill = sss > 0.5 ? uFillCol * vec3(1.35, 1.0, 0.85) : uFillCol; // skin stays warm in shadow
+  col += alb * fill * (0.45 + 0.55 * n.y) * occ;
+  col += alb * uFillCol * vec3(0.5, 0.35, 0.3) * max(0.0, -n.y) * occ; // warm bounce from the ground
+  col += alb * vec3(0.07, 0.055, 0.06) * max(0.0, dot(n, v)) * occ; // the world in front
   col += uRimCol * pow(max(0.0, dot(n, normalize(uRim))), 2.0) * pow(1.0 - max(0.0, dot(n, v)), 2.0) * ao * (mat == 0 ? 0.9 : 0.5);
   col += uKeyCol * spec * pow(max(0.0, dot(n, normalize(L + v))), rough) * sh;
-  col *= mix(0.55, 1.0, ao) * 1.45;
-  col = col / (1.0 + 0.35 * col); col = pow(col, vec3(1.0 / 2.2)); col = mix(vec3(dot(col, vec3(0.3, 0.55, 0.15))), col, 0.85); col = (col - 0.5) * 1.35 + 0.36;
+  col *= mix(0.4, 1.0, ao) * 1.35;
+  col = col / (1.0 + 0.3 * col); col = pow(col, vec3(1.0 / 2.2)); col = mix(vec3(dot(col, vec3(0.3, 0.55, 0.15))), col, 0.9);
+  col = clamp((col - 0.5) * 1.3 + 0.44, 0.0, 1.0); col *= col * (3.0 - 2.0 * col) * 0.35 + 0.65; // deep shadows, held lights
   o = vec4(col, p.z > uCardZ ? 1.0 : 0.5);
 }`;
 const VERT = `#version 300 es
 void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
 
 export interface Light { key: V3; keyCol: V3; fillCol: V3; rim: V3; rimCol: V3 }
-export interface Shot { w: number; h: number; fovY: number; caps: Cap[]; light: Light; card?: { z: number; cx: number; cy: number; hw: number; hh: number }; ink?: Frame }
+export interface Shot { w: number; h: number; fovY: number; caps: Cap[]; light: Light; card?: { z: number; cx: number; cy: number; hw: number; hh: number }; frame?: Frame; ink?: boolean }
 
 let gl: WebGL2RenderingContext | null = null;
 let prog: WebGLProgram | null = null;
@@ -246,7 +272,7 @@ export function renderHand(s: Shot): { all: HTMLCanvasElement; front: HTMLCanvas
   const A = new Float32Array(MAX * 4), B = new Float32Array(MAX * 4), M = new Float32Array(MAX * 4), U = new Float32Array(MAX * 3);
   caps.forEach((c, i) => {
     A.set([...c.a, c.ra], i * 4); B.set([...c.b, c.rb], i * 4);
-    M.set([c.group, c.k, c.nail ? 1 : 0, c.joint ? 1 : 0], i * 4); U.set(c.up ?? [0, 0, 1], i * 3);
+    M.set([c.group, c.k, c.flat ? 2 : c.nail ? 1 : 0, c.joint ? 1 : 0], i * 4); U.set(c.up ?? [0, 0, 1], i * 3);
   });
   g.uniform2f(u('uRes'), W, H); g.uniform1i(u('uN'), caps.length); g.uniform1f(u('uTan'), Math.tan(s.fovY / 2));
   g.uniform4fv(u('uA'), A); g.uniform4fv(u('uB'), B); g.uniform4fv(u('uM'), M); g.uniform3fv(u('uU'), U);
@@ -255,10 +281,10 @@ export function renderHand(s: Shot): { all: HTMLCanvasElement; front: HTMLCanvas
   const cd = s.card;
   g.uniform1f(u('uCardZ'), cd ? cd.z : -1e9);
   g.uniform4f(u('uCard'), cd ? cd.cx : 0, cd ? cd.cy : 0, cd ? cd.hw : 0, cd ? cd.hh : 0);
-  g.uniform1f(u('uInk'), s.ink ? 1 : 0);
-  if (s.ink) {
-    const b = basis(s.ink);
-    g.uniform3fv(u('uHO'), s.ink.origin); g.uniform3fv(u('uHX'), b.X); g.uniform3fv(u('uHY'), b.Y); g.uniform3fv(u('uHZ'), b.Z); g.uniform1f(u('uHS'), b.s);
+  g.uniform1f(u('uInk'), s.frame ? (s.ink ? 1 : 0) : -1);
+  if (s.frame) {
+    const b = basis(s.frame);
+    g.uniform3fv(u('uHO'), s.frame.origin); g.uniform3fv(u('uHX'), b.X); g.uniform3fv(u('uHY'), b.Y); g.uniform3fv(u('uHZ'), b.Z); g.uniform1f(u('uHS'), b.s);
   }
   g.drawArrays(g.TRIANGLES, 0, 3);
   const px = new Uint8Array(W * H * 4);

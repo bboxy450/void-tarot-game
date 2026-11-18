@@ -5,6 +5,6 @@ const out = process.argv[3] ?? `/tmp/void-tarot-hands-${Date.now()}.png`;
 const b = await launch({ port: 9341, width: 2160, height: 1140 });
 try {
   await b.goto(url);
-  await b.waitFor('window.ready === true');
+  await b.waitFor('window.ready === true', 30000).catch((e) => { console.error(b.errors); throw e; });
   console.log(await b.shot(out), 'errors:', b.errors.length ? b.errors : 'none');
 } finally { await b.close(); }
