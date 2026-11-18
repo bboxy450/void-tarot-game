@@ -1,6 +1,6 @@
 // The hands: a real hand mesh (public/hands: Dan Ulrich's CC0 realistic hand from Blender's Human Base
-// Meshes, rigged by tools/rig-hand.py), posed by turning its joints, lit with three.js (soft shadows, a sheen
-// for skin), rendered once at four samples per pixel and cut to 40-colour sprites. The tattoo is drawn in
+// Meshes, rigged by tools/rig-hand.py), posed by turning its joints, lit with three.js (soft shadows, matte
+// mottled skin), rendered at four samples per pixel, painted over (Kuwahara) and cut to 40-colour sprites. The tattoo is drawn in
 // the rest pose, so it rides the skin.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -108,7 +108,7 @@ function place(r: Rig, origin: THREE.Vector3, fingers: number[], back: number[])
 const worldOf = (r: Rig, name: string) => r.bones.get(name)!.getWorldPosition(new THREE.Vector3());
 
 function skin(r: Rig, ink: boolean) {
-  const m = new THREE.MeshPhysicalMaterial({ color: 0xe0b49c, roughness: 0.62, sheen: 0.6, sheenColor: new THREE.Color(0xff8a70), sheenRoughness: 0.7 });
+  const m = new THREE.MeshStandardMaterial({ color: 0xd2a48c, roughness: 0.68 });
   const X = new THREE.Vector3().crossVectors(r.fingers, r.back).normalize(); // toward the little finger on the right hand
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uW = { value: r.wrist }; sh.uniforms.uX = { value: X }; sh.uniforms.uY = { value: r.fingers }; sh.uniforms.uZ = { value: r.back };
@@ -124,9 +124,15 @@ float n3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
 ${SPIDER_GLSL}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
   { vec3 r = (vRest - uW) * 100.0; // cm, rest pose
-    float g = n3(r * 2.2) * 0.5 + n3(r * 5.0) * 0.3 + n3(r * 11.0) * 0.2;
-    diffuseColor.rgb *= 0.86 + 0.28 * g;
-    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.78, 0.45, 0.4), 0.3 * smoothstep(0.55, 0.8, n3(r * 0.8 + 3.0)));
+    if (dot(r, uY) < -1.5) discard; // the forearm stays inside the sleeve
+    float g = n3(r * 2.2) * 0.45 + n3(r * 6.0) * 0.3 + n3(r * 17.0) * 0.25;
+    diffuseColor.rgb *= 0.8 + 0.4 * g;
+    // blotches: flushed knuckles and fingertips, a cooler, bluish cast over the back of the hand where veins run
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.42, 0.4), 0.25 * smoothstep(0.5, 0.8, n3(r * 0.9 + 3.0)));
+    float vein = 1.0 - smoothstep(0.0, 0.12, abs(n3(r * vec3(0.9, 0.35, 0.9) + 7.0) - 0.5));
+    if (dot(r, uZ) > 0.0) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.52, 0.66), 0.35 * vein * smoothstep(1.0, 4.0, dot(r, uY)) * (1.0 - smoothstep(8.0, 10.0, dot(r, uY))));
+    // freckles
+    diffuseColor.rgb *= 1.0 - 0.25 * smoothstep(0.82, 0.9, n3(r * 9.0 + 11.0));
     if (uInk > 0.5 && dot(r, uZ) > 0.2) { float k = spider(vec2(-dot(r, uX), dot(r, uY))); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.04, 0.05, 0.09), 0.88 * k); } }`);
   };
   r.mesh.material = m;
@@ -134,13 +140,14 @@ ${SPIDER_GLSL}`)
 }
 
 const cloth = () => new THREE.MeshStandardMaterial({ color: 0x3a2266, roughness: 0.95 });
+/** the inside of the sleeve, in shadow */
+const lining = () => new THREE.MeshBasicMaterial({ color: 0x120a20, side: THREE.BackSide });
 const gold = () => new THREE.MeshStandardMaterial({ color: 0xb08030, roughness: 0.4, metalness: 0.7 });
 /** a sleeve over the wrist, along the forearm away from the fingers */
 function sleeve(r: Rig, scene: THREE.Scene) {
   const w = worldOf(r, 'wrist'), f = worldOf(r, 'middle-finger-metacarpal').sub(w).normalize();
   const mk = (len: number, r0: number, r1: number, mat: THREE.Material, off: number) => {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, len, 28, 1, true), mat);
-    m.material.side = THREE.DoubleSide;
     m.position.copy(w).addScaledVector(f, -off - len / 2);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), f);
     m.castShadow = m.receiveShadow = true;
@@ -148,6 +155,7 @@ function sleeve(r: Rig, scene: THREE.Scene) {
   };
   mk(0.8, 3.15, 3.2, gold(), 1.2);
   mk(30, 3.1, 5.0, cloth(), 1.9);
+  mk(30, 3.05, 4.95, lining(), 1.9);
 }
 
 function lights(scene: THREE.Scene, key: number[], target: THREE.Vector3) {
@@ -156,7 +164,7 @@ function lights(scene: THREE.Scene, key: number[], target: THREE.Vector3) {
   k.castShadow = true; k.shadow.mapSize.set(2048, 2048); k.shadow.radius = 3;
   const c = k.shadow.camera as THREE.OrthographicCamera; c.left = c.bottom = -25; c.right = c.top = 25; c.near = 1; c.far = 140; k.shadow.bias = -0.0005;
   scene.add(k, k.target);
-  scene.add(new THREE.HemisphereLight(0x6a5aa8, 0x6a4030, 0.9));
+  scene.add(new THREE.HemisphereLight(0x5a4a98, 0x5a3020, 0.6));
   const front = new THREE.DirectionalLight(0xc8a0a0, 0.5); front.position.set(0, 20, 60).add(target); front.target.position.copy(target); scene.add(front, front.target);
   const rim = new THREE.DirectionalLight(0x8a90ff, 1.2); rim.position.copy(target).add(new THREE.Vector3(40, 10, -30)); rim.target.position.copy(target); scene.add(rim, rim.target);
 }
@@ -255,9 +263,35 @@ function palette(cols: number[][], n: number): number[][] {
   return boxes.map((b) => [0, 1, 2].map((c) => b.reduce((a, p) => a + p[c], 0) / b.length));
 }
 
+/** Paint over a render: each pixel takes the mean of the calmest of its four neighbouring quadrants (Kuwahara),
+ * so flats turn into strokes while edges stay sharp. Empty pixels stay empty and are not sampled. */
+function kuwahara(img: Uint8ClampedArray, W: number, H: number, R: number): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(img);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const q = (y * W + x) * 4;
+    if (img[q + 3] === 0) continue;
+    let best = 1e9;
+    for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      let n = 0, r = 0, g = 0, b = 0, v = 0;
+      for (let j = 0; j <= R; j++) for (let i = 0; i <= R; i++) {
+        const xx = x + dx * i, yy = y + dy * j;
+        if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const k = (yy * W + xx) * 4;
+        if (img[k + 3] !== img[q + 3]) continue; // same layer only: skin does not bleed over the card or the edge
+        const l = img[k] + img[k + 1] + img[k + 2];
+        n++; r += img[k]; g += img[k + 1]; b += img[k + 2]; v += l * l;
+      }
+      const m = (r + g + b) / n, varc = v / n - m * m;
+      if (varc < best) { best = varc; out[q] = r / n; out[q + 1] = g / n; out[q + 2] = b / n; }
+    }
+  }
+  return out;
+}
+
 /** Reduce a picture at SS samples per pixel (top down; a = 0 empty, 128 behind the card, 255 in front) to sprite pixels, cut to a 40-colour palette. Returns all, front-of-card and behind-card sprites. */
 export function toSprites(img: Uint8ClampedArray, W: number, H: number, SS: number, w: number, h: number): { all: HTMLCanvasElement; front: HTMLCanvasElement; back: HTMLCanvasElement } {
   const s = { w, h };
+  img = kuwahara(img, W, H, SS);
   // --- reduce to sprite pixels
   const mk = () => { const c = document.createElement('canvas'); c.width = s.w; c.height = s.h; return c; };
   const out = [mk(), mk(), mk()];
