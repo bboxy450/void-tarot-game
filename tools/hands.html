@@ -1,30 +1,31 @@
 <!doctype html>
-<!-- Hand bench: the painted hand sprites alone, enlarged and at game size. Open /tools/hands.html under pnpm dev. -->
+<!-- Hand bench: the four ways of making the hands, side by side (row per style: fist with staff, card hand, empty hand). Open /tools/hands.html under pnpm dev; ?only=mesh shows one. -->
 <html><head><meta charset="utf-8"><title>hands</title>
-<style>body{margin:0;background:#20163a}canvas{image-rendering:pixelated;display:block}</style></head>
+<style>body{margin:0;background:#20163a;color:#e8dcc0;font:16px Georgia}canvas{image-rendering:pixelated;display:block}</style></head>
 <body><canvas id="c"></canvas>
 <script type="module">
-const { fistSprite, cardHandSprites, FIST_PAD: _p } = await import('/src/ui/hands.ts?bench=' + Date.now());
-const FIST_PAD = _p;
-const img = new Image();
-img.src = '/cards/01-magician.jpg';
-await img.decode();
-const fist = fistSprite(), hand = cardHandSprites();
-// a card miniature like the game's
+const { handSprites, HAND_STYLES, FIST_PAD } = await import('/src/ui/hands.ts?bench=' + Date.now());
+const only = new URLSearchParams(location.search).get('only');
+const styles = only ? [only] : HAND_STYLES;
+const img = new Image(); img.src = '/cards/01-magician.jpg'; await img.decode();
 const card = document.createElement('canvas'); card.width = 80; card.height = 120;
 const g = card.getContext('2d'); g.filter = 'brightness(1.75) contrast(1.15) saturate(1.25)'; g.drawImage(img, 1, 1, 78, 118); g.filter = 'none';
-g.fillStyle = '#d8a83a'; g.strokeStyle = '#d8a83a'; g.strokeRect(0.5, 0.5, 79, 119);
-const S = 3, cw = 180, ch = 280;
-const c = document.getElementById('c'); c.width = 4 * cw * S; c.height = ch * S + 300; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-const bgs = ['#3a2c5a', '#5a6a3a', '#b08050', '#2a1e3a'];
-const panel = (i, draw) => { x.save(); x.beginPath(); x.rect(i * cw * S, 0, cw * S, ch * S); x.clip(); x.fillStyle = bgs[i]; x.fillRect(i * cw * S, 0, cw * S, ch * S); x.translate(i * cw * S, 0); x.scale(S, S); draw(); x.restore(); };
-const staff = () => { x.fillStyle = '#5a3820'; x.fillRect(84, 0, 13, 120); x.fillStyle = '#86582e'; x.fillRect(87, 0, 3, 120); };
-panel(0, () => { staff(); x.drawImage(fist, -FIST_PAD + 10, 0); });
-panel(1, () => { x.drawImage(hand.back, 0, 0); x.drawImage(card, 40, 40); x.drawImage(hand.front, 0, 0); });
-panel(2, () => { x.drawImage(hand.open, 0, 0); });
-panel(3, () => { staff(); x.drawImage(fist, -FIST_PAD + 10, 0); });
-// game size: 1 sprite pixel = 2 screen pixels at a 900px tall window... shown at 1x and 2x
-x.fillStyle = '#4a3a62'; x.fillRect(0, ch * S, c.width, 300);
-x.save(); x.translate(20, ch * S + 10); staff(); x.drawImage(fist, -FIST_PAD + 10, 0); x.drawImage(hand.back, 160, 0); x.drawImage(card, 200, 40); x.drawImage(hand.front, 160, 0); x.drawImage(hand.open, 340, 0); x.restore();
+g.strokeStyle = '#d8a83a'; g.strokeRect(0.5, 0.5, 79, 119);
+const S = 2, RW = 560, RH = 290, cols = only ? 1 : 2;
+const c = document.getElementById('c'); c.width = cols * RW * S; c.height = Math.ceil(styles.length / cols) * RH * S;
+const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+for (let i = 0; i < styles.length; i++) {
+  const t0 = performance.now();
+  const sp = await handSprites(styles[i]);
+  const ms = performance.now() - t0;
+  x.save(); x.translate((i % cols) * RW * S, Math.floor(i / cols) * RH * S); x.scale(S, S); x.beginPath(); x.rect(0, 0, RW, RH); x.clip();
+  x.fillStyle = ['#3a2c5a', '#2c3a2a', '#4a3a2a', '#2a2a44'][i % 4]; x.fillRect(0, 0, RW, RH);
+  x.fillStyle = '#5a3820'; x.fillRect(80 + 10 - 6, 0, 12, 110);
+  x.drawImage(sp.fist, 10 - FIST_PAD, 0);
+  x.drawImage(sp.back, 190, 0); x.drawImage(card, 230, 40); x.drawImage(sp.front, 190, 0);
+  x.drawImage(sp.open, 380, 0);
+  x.fillStyle = '#f0e0b0'; x.font = '14px Georgia'; x.fillText(`${styles[i]}  (${ms.toFixed(0)} ms)`, 6, 284);
+  x.restore();
+}
 window.ready = true;
 </script></body></html>

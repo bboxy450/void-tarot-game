@@ -24,7 +24,7 @@ const list = views.length ? views : std;
 const b = await launch({ port: 9335 });
 try {
   await b.goto(url);
-  await b.waitFor('!!(window.__game && window.__game.world)');
+  await b.waitFor('!!(window.__game && window.__game.world && window.__game.game.hands.sprites)');
   const info = await b.eval('({counts: __game.counts, buildMs: __game.buildMs})');
   console.log(JSON.stringify(info));
   for (const v of list) {

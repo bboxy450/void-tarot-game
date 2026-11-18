@@ -68,7 +68,13 @@ export async function launch({ port = 9333, width = 1440, height = 900, gl = 'me
       throw new Error('timeout waiting for ' + expr);
     },
     async shot(file) {
-      const r = await send('Page.captureScreenshot', { format: 'png' });
+      // headless Chrome sometimes never answers a capture; give up after 10 s and ask again with the page in front
+      let r = null;
+      for (let i = 0; i < 4 && !r; i++) {
+        if (i) await send('Page.bringToFront', {});
+        r = await Promise.race([send('Page.captureScreenshot', { format: 'png' }), new Promise((ok) => setTimeout(() => ok(null), 10000))]);
+      }
+      if (!r) throw new Error('screenshot never came: ' + file);
       writeFileSync(file, Buffer.from(r.data, 'base64'));
       return file;
     },

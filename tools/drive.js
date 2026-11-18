@@ -25,7 +25,7 @@ const key = async (code, key, vk, hold = 0) => {
 
 try {
   await b.goto(url);
-  await b.waitFor('!!(window.__game && window.__game.game.cards.ready)', 120000);
+  await b.waitFor('!!(window.__game && window.__game.game.cards.ready && window.__game.game.hands.sprites)', 120000);
   console.log('dabs', JSON.stringify(await g('G.counts')), 'build ms', Math.round(await g('G.buildMs')));
 
   // the castle courtyard at dusk
@@ -146,7 +146,7 @@ try {
 
   // the title, then the game running on its own clock: frame times from requestAnimationFrame
   await b.goto(base);
-  await b.waitFor('!!(window.__game && window.__game.game.cards.ready)', 120000);
+  await b.waitFor('!!(window.__game && window.__game.game.cards.ready && window.__game.game.hands.sprites)', 120000);
   await new Promise((r) => setTimeout(r, 1500));
   await shot('00-title');
   await b.click(720, 450);

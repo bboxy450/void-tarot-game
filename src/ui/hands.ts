@@ -116,7 +116,7 @@ const SIDE_LIGHT: Light = { key: [-0.9, 0.75, 0.12], keyCol: [1.05, 0.78, 0.56],
 const at = (sx: number, sy: number, z: number, w: number, h: number): V3 => { const k = pxAt(z, h, FOV); return [(sx - w / 2) * k, (h / 2 - sy) * k, z]; };
 
 /** Left hand: a fist round the staff (sprite x 80), the thumb over the fingers, sleeve from the lower left. */
-export function fistSprite(): HTMLCanvasElement {
+export function fistSprite(paint = false): HTMLCanvasElement {
   const w = FIST_W, h = 280, z = -33, sx = 80 + FIST_PAD;
   const top = at(sx, 108, z, w, h), bottom = at(sx, 300, z, w, h), grip = at(sx, 200, z, w, h);
   const pose: Pose = {
@@ -128,11 +128,11 @@ export function fistSprite(): HTMLCanvasElement {
   const hollow = localToWorld(frame, [0.1, 9.2, -2.7]);
   frame.origin = [grip[0] - hollow[0], grip[1] - hollow[1], grip[2] - hollow[2]];
   const caps: Cap[] = [...hand(pose, frame), { a: top, b: bottom, ra: 1.05, rb: 1.1, group: 8, k: 0 }];
-  return renderHand({ w, h, fovY: FOV, caps, light: LANTERN_LIGHT, frame }).all;
+  return renderHand({ w, h, fovY: FOV, caps, light: LANTERN_LIGHT, frame, paint }).all;
 }
 
 /** Right hand: holding the card (fingers behind it: back; thumb in front: front), or empty and relaxed (open). */
-export function cardHandSprites(): { back: HTMLCanvasElement; front: HTMLCanvasElement; open: HTMLCanvasElement } {
+export function cardHandSprites(paint = false): { back: HTMLCanvasElement; front: HTMLCanvasElement; open: HTMLCanvasElement } {
   const w = 180, h = 280, cz = -38;
   const k = pxAt(cz, h, FOV);
   const c = at(80, 100, cz, w, h);
@@ -142,15 +142,27 @@ export function cardHandSprites(): { back: HTMLCanvasElement; front: HTMLCanvasE
     thumb: [[-0.65, 0.7, -0.2], [-0.45, 0.88, 0.1], [-0.3, 0.95, 0.12]], thumbBack: [-0.9, 0.1, 0.4],
   };
   const gripFrame: Frame = { origin: at(150, 200, -37.2, w, h), fingers: [-0.35, 0.55, -0.8], back: [0.8, 0.1, 0.6] };
-  const held = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, card, caps: hand(grip, gripFrame), frame: gripFrame, ink: TATTOO });
+  const held = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, card, caps: hand(grip, gripFrame), frame: gripFrame, ink: TATTOO, paint });
   const relaxed: Pose = {
     curl: [[0.4, 0.55, 0.3], [0.45, 0.6, 0.32], [0.52, 0.65, 0.34], [0.6, 0.7, 0.36]], spread: [-0.08, -0.02, 0.04, 0.1],
     thumb: [[-0.75, 0.6, -0.3], [-0.55, 0.8, -0.1], [-0.4, 0.9, 0.0]], thumbBack: [-0.6, 0.1, 0.8],
   };
   const openFrame: Frame = { origin: at(158, 222, -30, w, h), fingers: [-0.55, 0.5, -0.67], back: [0.2, 0.8, 0.55] };
-  const open = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, caps: hand(relaxed, openFrame), frame: openFrame, ink: TATTOO });
+  const open = renderHand({ w, h, fovY: FOV, light: SIDE_LIGHT, caps: hand(relaxed, openFrame), frame: openFrame, ink: TATTOO, paint });
   return { back: held.back, front: held.front, open: open.all };
 }
+
+/** Four ways of making the hands, to compare: ?hands=march|paint|mesh|masters */
+export const HAND_STYLES = ['march', 'paint', 'mesh', 'masters'] as const;
+export type HandStyle = (typeof HAND_STYLES)[number];
+export interface HandSprites { fist: HTMLCanvasElement; back: HTMLCanvasElement; front: HTMLCanvasElement; open: HTMLCanvasElement }
+export async function handSprites(style: HandStyle): Promise<HandSprites> {
+  if (style === 'mesh') return (await import('./handMesh')).meshSprites();
+  if (style === 'masters') return (await import('./handMasters')).mastersSprites();
+  const paint = style === 'paint';
+  return { fist: fistSprite(paint), ...cardHandSprites(paint) };
+}
+const urlStyle = (): HandStyle => { const v = new URLSearchParams(location.search).get('hands'); return (HAND_STYLES as readonly string[]).includes(v ?? '') ? (v as HandStyle) : 'march'; };
 
 function heartSprite(full: boolean): HTMLCanvasElement {
   const rows = ['.##..##.', '########', '########', '########', '.######.', '..####..', '...##...'];
@@ -170,8 +182,7 @@ export class Hands {
   ctx: CanvasRenderingContext2D;
   scale = 4;
   private lantern = lanternSprite();
-  private hand = cardHandSprites();
-  private fist = fistSprite();
+  sprites: HandSprites | null = null; // null until the chosen hands are made
   private hearts = [heartSprite(true), heartSprite(false)];
   private cardPx = new Map<number, HTMLCanvasElement>();
   private sparks: Spark[] = [];
@@ -182,6 +193,7 @@ export class Hands {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
+    handSprites(urlStyle()).then((sp) => { this.sprites = sp; });
   }
 
   resize(w: number, h: number) {
@@ -251,7 +263,8 @@ export class Hands {
       }
     }
     ctx.drawImage(this.lantern, lx, ly);
-    fine(this.fist, lx - FIST_PAD / 2, ly);
+    const sp = this.sprites;
+    if (sp) fine(sp.fist, lx - FIST_PAD / 2, ly);
     // glass glow and the flame inside
     for (let y = 28; y <= 49; y++) for (let x = 28; x <= 49; x++) {
       if (x === 38 || x === 39 || y === 38) continue;
@@ -290,7 +303,7 @@ export class Hands {
     if (o.card) {
       const showCard = !(th > 0.25 && th < 0.6);
       if (showCard) {
-        fine(this.hand.back, rx, ry);
+        if (sp) fine(sp.back, rx, ry);
         const cs = this.cardSprite(o.card.index, o.card.img);
         const rise = th >= 0.6 && th < 1 ? Math.round((1 - (th - 0.6) / 0.4) * 30) : 0;
         // the card's aura when it is ready to cast
@@ -310,9 +323,9 @@ export class Hands {
         fine(cs, rx + 20, ry + 20 + rise);
         ctx.restore();
       }
-      fine(showCard ? this.hand.front : this.hand.open, rx, ry);
+      if (sp) fine(showCard ? sp.front : sp.open, rx, ry);
     } else {
-      fine(this.hand.open, rx, ry);
+      if (sp) fine(sp.open, rx, ry);
     }
 
     // --- hearts
