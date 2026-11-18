@@ -1,10 +1,38 @@
-// Hands from a real hand mesh: the WebXR generic hand (public/hands, MIT), posed by turning its joints,
-// lit with three.js (soft shadows, a sheen for skin), rendered once at four samples per pixel and cut to
-// the same 40-colour sprites as the other hands. The tattoo is drawn from the rest pose, so it rides the skin.
+// The hands: a real hand mesh (public/hands: Dan Ulrich's CC0 realistic hand from Blender's Human Base
+// Meshes, rigged by tools/rig-hand.py), posed by turning its joints, lit with three.js (soft shadows, a sheen
+// for skin), rendered once at four samples per pixel and cut to 40-colour sprites. The tattoo is drawn in
+// the rest pose, so it rides the skin.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { SPIDER_GLSL, toSprites, pxAt } from './handRender';
 import { FIST_PAD, FIST_W, type HandSprites } from './hands';
+
+/** The spider tattoo in hand space (cm: wrist at 0, fingers +y, thumb -x), shared with the mesh hands. */
+export const SPIDER_GLSL = `float seg(vec2 p, vec2 a, vec2 b){ vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
+// a spider on the back of the hand, in hand space (cm): head toward the index knuckle, legs over the knuckle and the thumb
+float spider(vec2 q){
+  q = (q - vec2(-1.2, 5.0)) / 0.7 + vec2(-0.6, 4.6); // smaller, toward the thumb
+  vec2 T = vec2(-1.0, 5.6), A = vec2(-0.25, 3.5);
+  vec2 d = normalize(T - A), s = vec2(d.y, -d.x);
+  vec2 qa = q - A; vec2 la = vec2(dot(qa, s), dot(qa, d));
+  float ink = 1.0 - smoothstep(0.95, 1.05, length(la / vec2(1.2, 1.45)));
+  // the pale swirl on its back
+  float ang = atan(la.y, la.x), rr = length(la / vec2(1.2, 1.45));
+  float sw = abs(fract((rr * 3.2 - ang / 6.2832) ) - 0.5);
+  if (rr < 0.7 && sw < 0.12) ink *= 0.15;
+  vec2 qt = q - T; ink = max(ink, 1.0 - smoothstep(0.9, 1.0, length(vec2(dot(qt, s), dot(qt, d)) / vec2(0.7, 0.85))));
+  vec2 K[16] = vec2[16](vec2(-2.0, 7.4), vec2(-2.6, 9.7), vec2(-2.5, 6.5), vec2(-3.7, 6.1), vec2(-2.5, 5.0), vec2(-3.1, 3.5), vec2(-1.9, 4.0), vec2(-2.3, 1.8),
+                        vec2(0.3, 7.0), vec2(0.8, 8.1), vec2(0.8, 5.8), vec2(1.7, 6.5), vec2(1.0, 4.4), vec2(2.4, 3.1), vec2(1.0, 2.1), vec2(1.7, 0.5));
+  for (int i = 0; i < 8; i++) {
+    vec2 o = i == 7 ? A : T, k = K[i * 2], e = K[i * 2 + 1];
+    float w = 0.3 + 0.04 * sin(float(i) * 3.1);
+    ink = max(ink, 1.0 - smoothstep(w - 0.1, w, min(seg(q, o, k), seg(q, k, e) + 0.04 * length(q - k))));
+  }
+  return ink;
+}`;
+
+
+/** World size of one sprite pixel at depth z (cm), for placing things over sprite coordinates. */
+export const pxAt = (z: number, h: number, fovY: number) => (2 * Math.abs(z) * Math.tan(fovY / 2)) / h;
 
 const FOV = 35, SS = 4;
 const FINGERS = ['index', 'middle', 'ring', 'pinky'];
@@ -51,7 +79,9 @@ function pose(r: Rig, ps: MeshPose) {
   FINGERS.forEach((f, i) => {
     const names = CHAIN.map((c) => `${f}-finger-${c}`);
     turn(names, 1, r.back, ps.spread[i]);
-    for (let k = 1; k <= 3; k++) turn(names, k, new THREE.Vector3().crossVectors(r.back, dir(names, k)).normalize(), ps.curl[i][k - 1]);
+    // one hinge for the whole finger: taken per joint, back x bone flips once a joint passes a right angle
+    const hinge = new THREE.Vector3().crossVectors(r.back, dir(names, 1)).normalize();
+    for (let k = 1; k <= 3; k++) turn(names, k, hinge, ps.curl[i][k - 1]);
   });
   const th = ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip'];
   // the thumb swings in front of the palm, then folds across it toward the little finger (its nail faces sideways)
@@ -157,8 +187,8 @@ function shoot(scene: THREE.Scene, w: number, h: number, occluder?: THREE.Object
 /** The three shots: pose, and where the hand goes (fingers and back of hand as camera-space directions). */
 export const MESH = {
   fist: { pose: { curl: [[1.4, 1.6, 0.7], [1.5, 1.65, 0.7], [1.5, 1.65, 0.7], [1.45, 1.6, 0.7]], spread: [0.04, 0, -0.03, -0.08], thumbSwing: 0.7, thumbTwist: 0, thumb: [0.3, 0.8, 0.6] } as MeshPose, fingers: [0.5, 0.4, -0.75], back: [-0.83, 0.1, -0.55] },
-  held: { pose: { curl: [[0.35, 0.45, 0.25], [0.4, 0.5, 0.25], [0.45, 0.55, 0.25], [0.55, 0.6, 0.3]], spread: [-0.04, 0, 0.04, 0.1], thumbSwing: 0.8, thumbTwist: 0, thumb: [0.1, 0.25, 0.2] } as MeshPose, at: [148, 262, -36], fingers: [-0.2, 0.9, -0.4], back: [0.6, 0.2, 0.75] },
-  open: { pose: { curl: [[0.4, 0.55, 0.3], [0.45, 0.6, 0.32], [0.52, 0.65, 0.34], [0.6, 0.7, 0.36]], spread: [-0.08, -0.02, 0.04, 0.1], thumbSwing: 0.2, thumbTwist: 0, thumb: [0.15, 0.2, 0.15] } as MeshPose, at: [158, 222, -30], fingers: [-0.55, 0.5, -0.67], back: [0.2, 0.8, 0.55] },
+  held: { pose: { curl: [[0.2, 0.3, 0.15], [0.3, 0.35, 0.2], [0.45, 0.5, 0.3], [0.6, 0.6, 0.35]], spread: [-0.04, 0, 0.04, 0.1], thumbSwing: 1.3, thumbTwist: 0, thumb: [0.2, 0.3, 0.2] } as MeshPose, at: [148, 262, -36], fingers: [-0.25, 0.8, -0.55], back: [0.75, 0.3, 0.6] },
+  open: { pose: { curl: [[0.6, 0.8, 0.4], [0.7, 0.85, 0.4], [0.8, 0.9, 0.45], [0.9, 0.95, 0.5]], spread: [-0.08, -0.02, 0.04, 0.1], thumbSwing: 0.5, thumbTwist: 0, thumb: [0.1, 0.3, 0.2] } as MeshPose, at: [146, 218, -30], fingers: [-0.55, 0.5, -0.67], back: [0.2, 0.8, 0.55] },
 };
 
 export async function meshSprites(M = MESH): Promise<HandSprites> {
@@ -201,3 +231,67 @@ function build(M: typeof MESH, L: Rig, R1: Rig, R2: Rig): HandSprites {
   const open = toSprites(shoot(s3, w, h), w * SS, h * SS, SS, w, h).all;
   return { fist, back: held.back, front: held.front, open };
 }
+
+const COLOURS = 40;
+/** Median cut: split the colour box with the widest channel at its median until there are n boxes; each box's mean is a colour. */
+function palette(cols: number[][], n: number): number[][] {
+  let boxes = [cols];
+  while (boxes.length < n) {
+    let bi = -1, bc = 0, br = -1;
+    boxes.forEach((b, i) => {
+      if (b.length < 2) return;
+      for (let c = 0; c < 3; c++) {
+        let lo = 255, hi = 0;
+        for (const p of b) { lo = Math.min(lo, p[c]); hi = Math.max(hi, p[c]); }
+        const score = (hi - lo) * Math.sqrt(b.length);
+        if (score > br) { br = score; bi = i; bc = c; }
+      }
+    });
+    if (bi < 0) break;
+    const b = boxes[bi].slice().sort((p, q) => p[bc] - q[bc]);
+    const m = b.length >> 1;
+    boxes.splice(bi, 1, b.slice(0, m), b.slice(m));
+  }
+  return boxes.map((b) => [0, 1, 2].map((c) => b.reduce((a, p) => a + p[c], 0) / b.length));
+}
+
+/** Reduce a picture at SS samples per pixel (top down; a = 0 empty, 128 behind the card, 255 in front) to sprite pixels, cut to a 40-colour palette. Returns all, front-of-card and behind-card sprites. */
+export function toSprites(img: Uint8ClampedArray, W: number, H: number, SS: number, w: number, h: number): { all: HTMLCanvasElement; front: HTMLCanvasElement; back: HTMLCanvasElement } {
+  const s = { w, h };
+  // --- reduce to sprite pixels
+  const mk = () => { const c = document.createElement('canvas'); c.width = s.w; c.height = s.h; return c; };
+  const out = [mk(), mk(), mk()];
+  const imgs = out.map((c) => c.getContext('2d')!.createImageData(s.w, s.h));
+  const covered = new Uint8Array(s.w * s.h), front = new Uint8Array(s.w * s.h);
+  const rgb = new Float32Array(s.w * s.h * 3);
+  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
+    let r = 0, gg = 0, b = 0, n = 0, f = 0;
+    for (let j = 0; j < SS; j++) for (let i = 0; i < SS; i++) {
+      const q = ((y * SS + j) * W + x * SS + i) * 4;
+      if (img[q + 3] === 0) continue;
+      r += img[q]; gg += img[q + 1]; b += img[q + 2]; n++; if (img[q + 3] > 200) f++;
+    }
+    const o = y * s.w + x;
+    if (n * 2 < SS * SS) continue;
+    covered[o] = 1; front[o] = f * 2 >= n ? 1 : 0;
+    rgb.set([r / n, gg / n, b / n], o * 3);
+  }
+  // cut the palette where the eye tells shades apart: in square-root space, so the shadows keep their steps
+  const seen: number[][] = [];
+  for (let o = 0; o < s.w * s.h; o++) if (covered[o]) seen.push([0, 1, 2].map((c) => Math.sqrt(rgb[o * 3 + c] / 255) * 255));
+  const pal = palette(seen, COLOURS).map((p) => p.map((v) => ((v / 255) ** 2) * 255));
+  for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
+    const o = y * s.w + x;
+    if (!covered[o]) continue;
+    let best = pal[0], bd = 1e9;
+    for (const p of pal) { const d = (p[0] - rgb[o * 3]) ** 2 + (p[1] - rgb[o * 3 + 1]) ** 2 + (p[2] - rgb[o * 3 + 2]) ** 2; if (d < bd) { bd = d; best = p; } }
+    const col = best.map(Math.round);
+    for (const [idx, ok] of [[0, true], [1, front[o] === 1], [2, front[o] === 0]] as [number, boolean][]) {
+      if (!ok) continue;
+      imgs[idx].data.set([col[0], col[1], col[2], 255], o * 4);
+    }
+  }
+  out.forEach((c, i) => c.getContext('2d')!.putImageData(imgs[i], 0, 0));
+  return { all: out[0], front: out[1], back: out[2] };
+}
+

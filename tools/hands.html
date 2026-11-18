@@ -1,30 +1,30 @@
 <!doctype html>
-<!-- Hand bench: the four ways of making the hands, side by side (row per style: fist with staff, card hand, empty hand). Open /tools/hands.html under pnpm dev; ?only=mesh shows one. -->
+<!-- Hand bench: the hand sprites enlarged, with a card and the staff. Open /tools/hands.html under pnpm dev.
+     Try poses without editing code: #[{"fist":{"pose":{"thumbSwing":1}}}, ...] adds a row per override of MESH. -->
 <html><head><meta charset="utf-8"><title>hands</title>
-<style>body{margin:0;background:#20163a;color:#e8dcc0;font:16px Georgia}canvas{image-rendering:pixelated;display:block}</style></head>
+<style>body{margin:0;background:#20163a}canvas{image-rendering:pixelated;display:block}</style></head>
 <body><canvas id="c"></canvas>
 <script type="module">
-const { handSprites, HAND_STYLES, FIST_PAD } = await import('/src/ui/hands.ts?bench=' + Date.now());
-const only = new URLSearchParams(location.search).get('only');
-const styles = only ? [only] : HAND_STYLES;
+const { meshSprites, MESH } = await import('/src/ui/handMesh.ts?bench=' + Date.now());
+const { FIST_PAD } = await import('/src/ui/hands.ts');
 const img = new Image(); img.src = '/cards/01-magician.jpg'; await img.decode();
 const card = document.createElement('canvas'); card.width = 80; card.height = 120;
 const g = card.getContext('2d'); g.filter = 'brightness(1.75) contrast(1.15) saturate(1.25)'; g.drawImage(img, 1, 1, 78, 118); g.filter = 'none';
 g.strokeStyle = '#d8a83a'; g.strokeRect(0.5, 0.5, 79, 119);
-const S = 2, RW = 560, RH = 290, cols = only ? 1 : 2;
-const c = document.getElementById('c'); c.width = cols * RW * S; c.height = Math.ceil(styles.length / cols) * RH * S;
+const rows = [{}, ...JSON.parse(decodeURIComponent(location.hash.slice(1) || '[]'))];
+const merge = (a, b) => { const o = structuredClone(a); for (const k in b) for (const kk in b[k]) { if (kk === 'pose') Object.assign(o[k].pose, b[k].pose); else o[k][kk] = b[k][kk]; } return o; };
+const S = rows.length > 2 ? 1 : 2, RW = 560, RH = 290;
+const c = document.getElementById('c'); c.width = RW * S; c.height = rows.length * RH * S;
 const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
-for (let i = 0; i < styles.length; i++) {
-  const t0 = performance.now();
-  const sp = await handSprites(styles[i]);
-  const ms = performance.now() - t0;
-  x.save(); x.translate((i % cols) * RW * S, Math.floor(i / cols) * RH * S); x.scale(S, S); x.beginPath(); x.rect(0, 0, RW, RH); x.clip();
+for (let i = 0; i < rows.length; i++) {
+  const sp = await meshSprites(merge(MESH, rows[i]));
+  x.save(); x.translate(0, i * RH * S); x.scale(S, S); x.beginPath(); x.rect(0, 0, RW, RH); x.clip();
   x.fillStyle = ['#3a2c5a', '#2c3a2a', '#4a3a2a', '#2a2a44'][i % 4]; x.fillRect(0, 0, RW, RH);
-  x.fillStyle = '#5a3820'; x.fillRect(80 + 10 - 6, 0, 12, 110);
+  x.fillStyle = '#5a3820'; x.fillRect(84, 0, 12, 110);
   x.drawImage(sp.fist, 10 - FIST_PAD, 0);
   x.drawImage(sp.back, 190, 0); x.drawImage(card, 230, 40); x.drawImage(sp.front, 190, 0);
   x.drawImage(sp.open, 380, 0);
-  x.fillStyle = '#f0e0b0'; x.font = '14px Georgia'; x.fillText(`${styles[i]}  (${ms.toFixed(0)} ms)`, 6, 284);
+  x.fillStyle = '#f0e0b0'; x.font = '11px Georgia'; x.fillText(JSON.stringify(rows[i]).slice(0, 110), 6, 284);
   x.restore();
 }
 window.ready = true;

@@ -26,7 +26,7 @@ pnpm typecheck
 | `M` | silence |
 
 URL flags: `?skip` starts without the title; `?at=x,z,yaw` starts somewhere else; `?shots` (for the
-driver) steps frames by hand; `?hands=march|paint|mesh|masters` picks how the hands are made (below).
+driver) steps frames by hand.
 
 ## What the cards do
 
@@ -70,11 +70,10 @@ moving lamps.
 - **Effects are paint too**: fire, water, gusts, oil, charged pools, lightning, smoke, Shades and the
   cards lying in the world are all dabs (`src/game/fx.ts`, `shades.ts`, `cards.ts`).
 - **The hands, hearts and aiming mark** are pixel sprites on a low-resolution canvas over the picture
-  (`src/ui/hands.ts`); the card in hand is a pixel miniature of its art. The hands are made once at load,
-  four ways, all cut to 40-colour sprites: `march`, posed distance-field hands ray-marched and lit
-  (`handRender.ts`); `paint`, the same forms painted over in brush strokes along the bones; `mesh`, the
-  WebXR generic hand mesh (`public/hands`, MIT) posed and lit in three.js (`handMesh.ts`); `masters`,
-  hands cut from public-domain paintings by Rombouts and Caravaggio (`handMasters.ts`).
+  (`src/ui/hands.ts`); the card in hand is a pixel miniature of its art. The hands are a real hand mesh
+  (`public/hands`: the CC0 realistic hand from Blender's Human Base Meshes, by Dan Ulrich), rigged by
+  `tools/rig-hand.py`, posed joint by joint and lit in three.js once at load, then cut to 40-colour sprites
+  (`src/ui/handMesh.ts`).
 - Resolution adapts: fewer pixels when frames are slow.
 
 ## Files
@@ -106,10 +105,8 @@ src/game/shades.ts             Shades
 src/game/cards.ts              cards in the world (painted from their art), the hand of cards
 src/game/cardData.ts           generated: titles, suits, meanings, image paths
 src/game/wind.ts               the gust function for sound and leaves
-src/ui/hands.ts                hands on screen, lantern flame, card miniature, hearts; ?hands= style
-src/ui/handRender.ts           distance-field hands: ray-march, brush painting, cut to 40-colour sprites
-src/ui/handMesh.ts             hands from the WebXR hand mesh, posed and lit in three.js
-src/ui/handMasters.ts          hands cut from old-master paintings
+src/ui/hands.ts                hands on screen, lantern flame, card miniature, hearts
+src/ui/handMesh.ts             the hands: hand mesh posed and lit in three.js, cut to 40-colour sprites
 src/ui/hud.ts                  title, count, names, hints, prompts, the reading
 src/audio.ts                   all sound, synthesized with Web Audio
 scripts/prepare-cards.mjs      downsizes the card art into public/cards and writes cardData.ts
@@ -117,7 +114,8 @@ tools/cdp.js                   a small DevTools-protocol client for headless Chr
 tools/drive.js                 the driver: plays the game headless and writes screenshots
 tools/look.js                  screenshots from given places
 tools/perf.js                  frame times in a windowed Chrome
-tools/hands.html               the hand bench: all four hand styles side by side (open under pnpm dev)
+tools/hands.html               the hand bench: the hand sprites enlarged (open under pnpm dev; #json overrides poses)
+tools/rig-hand.py              rigs the CC0 hand for public/hands: blender -b <bundle.blend> --python tools/rig-hand.py -- public/hands
 tools/handshot.js              screenshot of the hand bench
 ```
 
