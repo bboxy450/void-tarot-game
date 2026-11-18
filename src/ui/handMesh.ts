@@ -140,8 +140,6 @@ ${SPIDER_GLSL}`)
 }
 
 const cloth = () => new THREE.MeshStandardMaterial({ color: 0x3a2266, roughness: 0.95 });
-/** the inside of the sleeve, in shadow */
-const lining = () => new THREE.MeshBasicMaterial({ color: 0x120a20, side: THREE.BackSide });
 const gold = () => new THREE.MeshStandardMaterial({ color: 0xb08030, roughness: 0.4, metalness: 0.7 });
 /** a sleeve over the wrist, along the forearm away from the fingers */
 function sleeve(r: Rig, scene: THREE.Scene) {
@@ -150,12 +148,12 @@ function sleeve(r: Rig, scene: THREE.Scene) {
     const m = new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, len, 28, 1, true), mat);
     m.position.copy(w).addScaledVector(f, -off - len / 2);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), f);
+    m.material.side = THREE.DoubleSide;
     m.castShadow = m.receiveShadow = true;
     scene.add(m);
   };
   mk(0.8, 3.15, 3.2, gold(), 1.2);
   mk(30, 3.1, 5.0, cloth(), 1.9);
-  mk(30, 3.05, 4.95, lining(), 1.9);
 }
 
 function lights(scene: THREE.Scene, key: number[], target: THREE.Vector3) {
