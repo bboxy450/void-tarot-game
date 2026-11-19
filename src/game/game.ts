@@ -15,7 +15,7 @@ import { MARKS } from '../paint/brush';
 import { hex, mix } from '../paint/util';
 import { finishUniforms } from '../finish';
 import { GATE, TENT, groundHeight, hillMask } from '../world/layout';
-import { sunAt } from '../paint/light';
+import { sunAt, lampAt } from '../paint/light';
 
 const COOLDOWN = 0.45;
 const LEAF_COLS = ['#3f6a3f', '#6f823a', '#b0983e', '#d08a3a', '#a85a36', '#7a3c3e', '#e9c25e'].map(hex);
@@ -337,6 +337,7 @@ export class Game {
 
   /** sun on the player's hands, eased so a shadow edge does not flicker */
   handSun = 1;
+  handLamp: [number, number, number] = [0, 0, 0];
 
   drawOverlay() {
     const p = this.o.player;
@@ -352,7 +353,15 @@ export class Game {
       hearts: p.hearts,
       maxHearts: p.maxHearts,
       flame: 1,
-      sun: this.handSun = this.handSun + (sunAt(p.pos.x, groundHeight(p.pos.x, p.pos.z) + 1.2, p.pos.z, groundHeight(p.pos.x, p.pos.z)) - this.handSun) * Math.min(1, this.lastDt * 3),
+      ...this.handLight(p.pos.x, p.pos.z),
     });
+  }
+
+  /** The light at the player's hands, eased so a shadow's edge doesn't flicker: sun 0..1 and lamplight RGB. */
+  private handLight(x: number, z: number) {
+    const gy = groundHeight(x, z), k = Math.min(1, this.lastDt * 3), L = lampAt(x, gy + 1.2, z);
+    this.handSun += (sunAt(x, gy + 1.2, z, gy) - this.handSun) * k;
+    for (let i = 0; i < 3; i++) this.handLamp[i] += (L[i] - this.handLamp[i]) * k;
+    return { sun: this.handSun, lamp: this.handLamp };
   }
 }

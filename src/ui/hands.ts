@@ -116,6 +116,8 @@ function heartSprite(full: boolean): HTMLCanvasElement {
   return px.canvas();
 }
 
+/** how strongly lamplight warms the hand sprites (the paint uses 1.8, but its ramps start dark) */
+const GAIN = 0.4;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 
 interface Spark { x: number; y: number; vx: number; vy: number; life: number; c: string }
@@ -148,9 +150,12 @@ export class Hands {
   }
 
   private litPx = new Map<HTMLCanvasElement, HTMLCanvasElement>();
-  /** A hand sprite multiplied by shadow light (shade 0 = in the sun, 1 = in full shadow). */
-  lit(c: HTMLCanvasElement, shade: number): HTMLCanvasElement {
-    if (shade < 0.02) return c;
+  private warmPx = document.createElement('canvas');
+  /** A hand sprite in the world's light: multiplied by shadow (shade 0 = in the sun, 1 = in full shadow),
+   *  then warmed by lamplight L like the paint (light.ts warm), at a gentler gain: the sprites are already lit. */
+  lit(c: HTMLCanvasElement, shade: number, L: [number, number, number] = [0, 0, 0]): HTMLCanvasElement {
+    const m = Math.max(L[0], L[1], L[2]);
+    if (shade < 0.02 && m < 0.02) return c;
     let o = this.litPx.get(c);
     if (!o) { o = document.createElement('canvas'); o.width = c.width; o.height = c.height; this.litPx.set(c, o); }
     const x = o.getContext('2d')!;
@@ -160,6 +165,18 @@ export class Hands {
     const k = (a: number) => Math.round(255 * (1 - (1 - a) * shade));
     x.fillStyle = `rgb(${k(0.58)},${k(0.54)},${k(0.82)})`;
     x.fillRect(0, 0, o.width, o.height);
+    if (m >= 0.02) {
+      // the lamp's share: this light times GAIN * L (capped like warm), added on top
+      const s = m > 1.3 ? 1.3 / m : 1, w = this.warmPx;
+      w.width = o.width; w.height = o.height;
+      const y = w.getContext('2d')!;
+      y.drawImage(o, 0, 0);
+      y.globalCompositeOperation = 'multiply';
+      y.fillStyle = `rgb(${L.map(v => Math.round(255 * Math.min(1, v * GAIN * s))).join(',')})`;
+      y.fillRect(0, 0, w.width, w.height);
+      x.globalCompositeOperation = 'lighter';
+      x.drawImage(w, 0, 0);
+    }
     x.globalCompositeOperation = 'destination-in';
     x.drawImage(c, 0, 0);
     return o;
@@ -189,7 +206,7 @@ export class Hands {
     return c;
   }
 
-  draw(o: { t: number; dt: number; walk: number; walkAmt: number; card: { index: number; img: HTMLImageElement; glow: string; ready: number } | null; hearts: number; maxHearts: number; flame: number; sun?: number }) {
+  draw(o: { t: number; dt: number; walk: number; walkAmt: number; card: { index: number; img: HTMLImageElement; glow: string; ready: number } | null; hearts: number; maxHearts: number; flame: number; sun?: number; lamp?: [number, number, number] }) {
     const { ctx } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -199,7 +216,7 @@ export class Hands {
     const W = Math.ceil(this.canvas.width / 2), H = Math.ceil(this.canvas.height / 2);
     // the hands take the world's light: out of the sun they go dim and violet, like the shadows around them
     const shade = 1 - (o.sun ?? 1);
-    const fine = (c: HTMLCanvasElement, x: number, y: number) => ctx.drawImage(this.lit(c, shade), x, y, c.width / 2, c.height / 2);
+    const fine = (c: HTMLCanvasElement, x: number, y: number) => ctx.drawImage(this.lit(c, shade, o.lamp), x, y, c.width / 2, c.height / 2);
     const { t, dt } = o;
     this.throwT = Math.min(1, this.throwT + dt / 0.42);
     this.hurtT = Math.min(1, this.hurtT + dt / 0.4);
