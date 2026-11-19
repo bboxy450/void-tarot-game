@@ -15,6 +15,7 @@ import { MARKS } from '../paint/brush';
 import { hex, mix } from '../paint/util';
 import { finishUniforms } from '../finish';
 import { GATE, TENT, groundHeight, hillMask } from '../world/layout';
+import { sunAt } from '../paint/light';
 
 const COOLDOWN = 0.45;
 const LEAF_COLS = ['#3f6a3f', '#6f823a', '#b0983e', '#d08a3a', '#a85a36', '#7a3c3e', '#e9c25e'].map(hex);
@@ -334,6 +335,9 @@ export class Game {
     }
   }
 
+  /** sun on the player's hands, eased so a shadow edge does not flicker */
+  handSun = 1;
+
   drawOverlay() {
     const p = this.o.player;
     const idx = this.cards.current();
@@ -348,6 +352,7 @@ export class Game {
       hearts: p.hearts,
       maxHearts: p.maxHearts,
       flame: 1,
+      sun: this.handSun = this.handSun + (sunAt(p.pos.x, groundHeight(p.pos.x, p.pos.z) + 1.2, p.pos.z, groundHeight(p.pos.x, p.pos.z)) - this.handSun) * Math.min(1, this.lastDt * 3),
     });
   }
 }

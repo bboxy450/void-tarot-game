@@ -147,6 +147,24 @@ export class Hands {
     this.ctx.imageSmoothingEnabled = false;
   }
 
+  private litPx = new Map<HTMLCanvasElement, HTMLCanvasElement>();
+  /** A hand sprite multiplied by shadow light (shade 0 = in the sun, 1 = in full shadow). */
+  lit(c: HTMLCanvasElement, shade: number): HTMLCanvasElement {
+    if (shade < 0.02) return c;
+    let o = this.litPx.get(c);
+    if (!o) { o = document.createElement('canvas'); o.width = c.width; o.height = c.height; this.litPx.set(c, o); }
+    const x = o.getContext('2d')!;
+    x.globalCompositeOperation = 'copy';
+    x.drawImage(c, 0, 0);
+    x.globalCompositeOperation = 'multiply';
+    const k = (a: number) => Math.round(255 * (1 - (1 - a) * shade));
+    x.fillStyle = `rgb(${k(0.58)},${k(0.54)},${k(0.82)})`;
+    x.fillRect(0, 0, o.width, o.height);
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(c, 0, 0);
+    return o;
+  }
+
   /** A pixel miniature of the card art: downsampled, lifted, with a gold frame. */
   cardSprite(index: number, img: HTMLImageElement): HTMLCanvasElement {
     const got = this.cardPx.get(index);
@@ -171,7 +189,7 @@ export class Hands {
     return c;
   }
 
-  draw(o: { t: number; dt: number; walk: number; walkAmt: number; card: { index: number; img: HTMLImageElement; glow: string; ready: number } | null; hearts: number; maxHearts: number; flame: number }) {
+  draw(o: { t: number; dt: number; walk: number; walkAmt: number; card: { index: number; img: HTMLImageElement; glow: string; ready: number } | null; hearts: number; maxHearts: number; flame: number; sun?: number }) {
     const { ctx } = this;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -179,7 +197,9 @@ export class Hands {
     // layout in chunky units (2 canvas pixels); painted sprites draw at half size, so at full density
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     const W = Math.ceil(this.canvas.width / 2), H = Math.ceil(this.canvas.height / 2);
-    const fine = (c: HTMLCanvasElement, x: number, y: number) => ctx.drawImage(c, x, y, c.width / 2, c.height / 2);
+    // the hands take the world's light: out of the sun they go dim and violet, like the shadows around them
+    const shade = 1 - (o.sun ?? 1);
+    const fine = (c: HTMLCanvasElement, x: number, y: number) => ctx.drawImage(this.lit(c, shade), x, y, c.width / 2, c.height / 2);
     const { t, dt } = o;
     this.throwT = Math.min(1, this.throwT + dt / 0.42);
     this.hurtT = Math.min(1, this.hurtT + dt / 0.4);
@@ -263,7 +283,7 @@ export class Hands {
         ctx.rect(rx + 10, ry, 80, 120);
         ctx.clip();
         ctx.globalAlpha = 0.45 + 0.55 * o.card.ready;
-        fine(cs, rx + 20, ry + 20 + rise);
+        ctx.drawImage(cs, rx + 20, ry + 20 + rise, cs.width / 2, cs.height / 2);
         ctx.restore();
       }
       if (sp) fine(showCard ? sp.front : sp.open, rx, ry);

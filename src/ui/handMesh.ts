@@ -222,7 +222,7 @@ function build(M: typeof MESH, L: Rig, R1: Rig, R2: Rig): HandSprites {
   lights(s1, [-0.15, 1, -0.05], grip);
   const fist = toSprites(shoot(s1, fw, fh), fw * SS, fh * SS, SS, fw, fh).all;
   // --- right: holding the card (thumb in front), and empty
-  const w = 180, h = 280, cz = -38, k = pxAt(cz, h, (FOV * Math.PI) / 180);
+  const w = 230, h = 280, cz = -38, k = pxAt(cz, h, (FOV * Math.PI) / 180);
   pose(R1, M.held.pose);
   place(R1, at(M.held.at[0], M.held.at[1], M.held.at[2], w, h), M.held.fingers, M.held.back);
   skin(R1, true);
